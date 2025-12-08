@@ -98,10 +98,10 @@ if (isset($_POST['reset'])) {
 
     <style>
         .login-container {
-            max-width: 400px;
+            max-width: 550px;
             margin: auto;
-            margin-top: 100px;
-            padding: 20px;
+            margin-top: 50px;
+            padding: 40px;
             background: white;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -109,42 +109,51 @@ if (isset($_POST['reset'])) {
     </style>
 </head>
 
-<body style="background-image: url(https://www.polibatam.ac.id/wp-content/uploads/2023/05/Gedung.jpg);
-background-size: cover; background-position: center; backdrop-filter: blur(10px);">
+<body>
+    <div style="
+        position: fixed;
+        inset: 0;
+        background-image: url('https://www.polibatam.ac.id/wp-content/uploads/2023/05/Gedung.jpg');
+        background-size: cover;
+        background-position: center;
+        filter: blur(5px);
+        overflow: hidden;
+        transform: scale(1.1);
+        z-index: -1;
+    "></div>
 
 <div class="login-container">
-    <h2 class="text-center">Login</h2>
+    <img src="assets/poltek.jpeg" class="img-fluid mb-3 d-block mx-auto" style="width:170px;" alt="Logo">
+    <h2 class="text-center mb-4 text-dark fw-bold">Login</h2>
 
     <!-- FORM LOGIN -->
-    <form method="POST">
-        <div class="mb-3">
-            <label class="form-label">Username</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="fas fa-user"></i></span>
-                <input type="text" name="username" class="form-control" required>
+    <form method="post" class="mt-3">
+            <div class="mb-3">
+                <label for="username" class="form-label fw-semibold fs-6">Username</label>
+                <input type="text" class="form-control" id="username" placeholder="Enter username" required>
             </div>
-        </div>
 
-        <div class="mb-3">
-            <label class="form-label">Password</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                <input type="password" name="password" class="form-control" required>
+            <div class="mb-3">
+                <label for="password" class="form-label fw-semibold fs-6">Password</label>
+                <input type="password" class="form-control" id="password" placeholder="Enter password" required>
             </div>
-        </div>
 
-        <div class="mb-3">
-            <label class="form-label">Role</label>
-            <select name="role" class="form-select">
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-            </select>
-        </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold fs-7">Login Sebagai</label>
+                <select name="role" class="form-select form-select-md" required>
+                    <option value="">-- Pilih Role --</option>
+                    <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                </select>
+            </div>
 
-        <button type="submit" name="login" class="btn btn-primary w-100">
-            <i class="fas fa-sign-in-alt"></i> Login
-        </button>
-    </form>
+            <div class="text-center">
+                <button type="submit" class="mt-3 btn btn-dark w-50 py-3 fs-5">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </button>
+            </div>
+        </form>
+
 
     <p class="text-center mt-3">
         <a href="#" data-bs-toggle="modal" data-bs-target="#resetModal" class="link-primary">Forgot password?</a> |
