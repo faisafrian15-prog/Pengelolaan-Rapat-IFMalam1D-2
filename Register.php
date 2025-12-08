@@ -56,52 +56,69 @@ if (isset($_POST['register'])) {
     }
 }
 ?>
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <title>Form Register</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light d-flex justify-content-center align-items-center vh-100">
-
-    <div class="card shadow-lg border-0 rounded-4" style="width: 36rem; height: 780px;">
-        <div class="card-body p-5">
-            <h2 class="text-center mb-4 fw-bold text-dark">Form Registrasi</h2>
-            <form method="post">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">E-mail</label>
-                    <input type="email" name="email" class="form-control py-3" placeholder="Masukkan e-mail" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Username</label>
-                    <input type="text" name="username" class="form-control py-3" placeholder="Masukkan username" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Password</label>
-                    <input type="password" name="password" class="form-control py-3" placeholder="Masukkan password" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Konfirmasi Password</label>
-                    <input type="password" name="confirm" class="form-control py-3" placeholder="Ulangi password" required>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label fw-semibold">Pilih Role</label>
-                    <select name="role" class="form-select py-3" required>
-                        <option value="" disabled selected>-- Pilih Role --</option>
-                        <option value="user">User</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-                <div class="text-center mt-4">
-                    <button type="submit" name="register" class="btn btn-dark w-75 py-3 fs-5 rounded-4">Register</button>
-                </div>
-            </form>
-            <div class="text-center mt-4 fs-6">
-                <a href="Login.php" class="text-decoration-none fw-semibold text-dark">Sudah punya akun? Login</a>
-            </div>
-        </div>
-    </div>
-
-</body>
-</html>
+<html lang="en"> 
+<head> 
+     <meta charset="utf-8"> 
+     <meta name="viewport" content="width=device-width, initial-scale=1"> 
+    <title>Register Page</title> 
+ <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"> 
+ <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fontawesome/6.0.0/css/all.min.css"> 
+ <style> 
+    body { 
+        background-color: #f8f9fa; 
+ } 
+     .register-container { 
+        max-width: 400px; 
+        margin: auto; 
+        margin-top: 100px; 
+        padding: 20px; 
+        background: white; 
+        border-radius: 8px; 
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
+ } 
+    .register-container h2 { 
+        margin-bottom: 20px; 
+ } 
+ </style> 
+</head> 
+<body
+style="background-image: url(https://www.polibatam.ac.id/wp-content/uploads/2023/05/Gedung.jpg);
+background-size: cover; background-position: center;
+backdrop-filter: blur(10px); z-index: -1;"> 
+    <div class="Register-container"> 
+    <h2 class="text-center"> Register</h2> 
+ <form> 
+    <div class="mb-3"> 
+    <label for="username" class="form-label">E-mail</label> 
+    <div class="input-group"> 
+    <span class="group-text"><i class="fas fa-user"></i></span> 
+    <input type="text" class="form-control" id="E-mail" placeholder="Enter E-mail" required> 
+ </div> 
+ </div> 
+  <div class="mb-3"> 
+    <label for="username" class="form-label">Username</label> 
+    <div class="input-group"> 
+    <span class="group-text"><i class="fas fa-user"></i></span> 
+    <input type="text" class="form-control" id="username" placeholder="Enter Username" required> 
+ </div> 
+ </div> 
+ <div class="mb-3"> 
+ <label for="password" class="form-label">Password</label> 
+ <div class="input-group"> 
+ <span class="group-text"><i class="fas fa-lock"></i></span> 
+ <input type="password" class="form-control" id="password" placeholder="Enter password" required> 
+</div> 
+</div> 
+<div class="mb-3"> 
+ <label for="password" class="form-label">Confirm Password</label> 
+ <div class="input-group"> 
+ <span class="group-text"><i class="fas fa-lock"></i></span> 
+ <input type="password" class="form-control" id="Confirm password" placeholder="Enter your password again" required> 
+</div> 
+</div> 
+<button type="submit" class="btn btn-primary w-100"><i class="fas fa-signinalt"></i> Register</button> 
+</form> 
+</div> 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script> 
+</body> 
+</html> 

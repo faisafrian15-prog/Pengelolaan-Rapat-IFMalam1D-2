@@ -148,7 +148,7 @@ background-size: cover; background-position: center; backdrop-filter: blur(10px)
 
     <p class="text-center mt-3">
         <a href="#" data-bs-toggle="modal" data-bs-target="#resetModal" class="link-primary">Forgot password?</a> |
-        <a href="#" class="link-primary">Register</a>
+        <a href="Register.php" class="link-primary">Register</a>
     </p>
 </div>
 
