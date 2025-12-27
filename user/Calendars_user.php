@@ -137,7 +137,7 @@ $hariAwal = date("w", $hariPertama);
 <?php endforeach; ?>
 
 <footer class="bg-dark text-white text-center py-3 mt-auto">
-    &copy; 2025 - Dashboard Kamu
+    &copy; 2025 - Dashboard User
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

@@ -56,7 +56,7 @@
 
   <!-- Footer -->
   <footer class="bg-dark text-white text-center py-3 mt-auto">
-    &copy; 2025 - Dashboard Kamu
+    &copy; 2025 - Dashboard User
   </footer>
 
   <!-- Bootstrap JS -->
