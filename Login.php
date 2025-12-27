@@ -130,12 +130,12 @@ if (isset($_POST['reset'])) {
     <form method="post" class="mt-3">
             <div class="mb-3">
                 <label for="username" class="form-label fw-semibold fs-6">Username</label>
-                <input type="text" class="form-control" id="username" placeholder="Enter username" required>
+                <input type="text" name="username" class="form-control" id="username" placeholder="Enter username" required>
             </div>
 
             <div class="mb-3">
                 <label for="password" class="form-label fw-semibold fs-6">Password</label>
-                <input type="password" class="form-control" id="password" placeholder="Enter password" required>
+                <input type="password" name="password" class="form-control" id="password" placeholder="Enter password" required>
             </div>
 
             <div class="mb-3">
@@ -148,7 +148,7 @@ if (isset($_POST['reset'])) {
             </div>
 
             <div class="text-center">
-                <button type="submit" class="mt-3 btn btn-dark w-50 py-3 fs-5">
+                <button type="submit" name="login" class="mt-3 btn btn-dark w-50 py-3 fs-5">
                     <i class="fas fa-sign-in-alt"></i> Login
                 </button>
             </div>
