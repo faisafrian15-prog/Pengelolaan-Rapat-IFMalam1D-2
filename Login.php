@@ -123,7 +123,7 @@ if (isset($_POST['reset'])) {
     "></div>
 
 <div class="login-container">
-    <img src="assets/poltek.jpeg" class="img-fluid mb-3 d-block mx-auto" style="width:170px;" alt="Logo">
+    <img src="assets/P.png" class="img-fluid mb-3 d-block mx-auto" style="width:170px;" alt="Logo">
     <h2 class="text-center mb-4 text-dark fw-bold">Login</h2>
 
     <!-- FORM LOGIN -->
@@ -138,15 +138,6 @@ if (isset($_POST['reset'])) {
                 <input type="password" name="password" class="form-control" id="password" placeholder="Enter password" required>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold fs-7">Login Sebagai</label>
-                <select name="role" class="form-select form-select-md" required>
-                    <option value="">-- Pilih Role --</option>
-                    <option value="admin">Admin</option>
-                    <option value="user">User</option>
-                </select>
-            </div>
-
             <div class="text-center">
                 <button type="submit" name="login" class="mt-3 btn btn-dark w-50 py-3 fs-5">
                     <i class="fas fa-sign-in-alt"></i> Login
@@ -156,8 +147,7 @@ if (isset($_POST['reset'])) {
 
 
     <p class="text-center mt-3">
-        <a href="#" data-bs-toggle="modal" data-bs-target="#resetModal" class="link-primary">Forgot password?</a> |
-        <a href="Register.php" class="link-primary">Register</a>
+        <a href="#" data-bs-toggle="modal" data-bs-target="#resetModal" class="link-primary">Forgot password?</a> 
     </p>
 </div>
 
