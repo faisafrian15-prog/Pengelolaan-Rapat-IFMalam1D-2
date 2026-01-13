@@ -1,6 +1,8 @@
 <?php
-$bulan = date("n");
-$tahun = date("Y");
+include "../koneksi.php"; 
+
+$bulan = isset($_GET['bulan']) ? (int)$_GET['bulan'] : (int)date("n");
+$tahun = isset($_GET['tahun']) ? (int)$_GET['tahun'] : (int)date("Y");
 
 $namaBulan = [
     1=>"Januari",2=>"Februari",3=>"Maret",4=>"April",
@@ -8,14 +10,45 @@ $namaBulan = [
     9=>"September",10=>"Oktober",11=>"November",12=>"Desember"
 ];
 
-// Contoh agenda rapat
-$agenda = [
-    20 => "Rapat Bulanan Tim IT"
-];
+$agenda = [];
+
+$stmt = mysqli_prepare(
+    $koneksi,
+    "SELECT * FROM meetings WHERE MONTH(tanggal) = ? AND YEAR(tanggal) = ?"
+);
+mysqli_stmt_bind_param($stmt, "ii", $bulan, $tahun);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+
+if ($result) {
+    while ($row = mysqli_fetch_assoc($result)) {
+        if (isset($row['tanggal'])) {
+            $tgl = (int)date("j", strtotime($row['tanggal']));
+            $agenda[$tgl][] = $row;
+        }
+    }
+}
+mysqli_stmt_close($stmt);
 
 $hariPertama = mktime(0, 0, 0, $bulan, 1, $tahun);
-$jumlahHari = date("t", $hariPertama);
-$hariAwal = date("w", $hariPertama);
+$jumlahHari  = (int)date("t", $hariPertama);
+$hariAwal    = (int)date("w", $hariPertama);
+
+$prevBulan = $bulan - 1;
+$prevTahun = $tahun;
+if ($prevBulan < 1) {
+    $prevBulan = 12;
+    $prevTahun--;
+}
+
+$nextBulan = $bulan + 1;
+$nextTahun = $tahun;
+if ($nextBulan > 12) {
+    $nextBulan = 1;
+    $nextTahun++;
+}
+
+$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
 <!DOCTYPE html>
@@ -23,121 +56,163 @@ $hariAwal = date("w", $hariPertama);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calendars</title>
+<title>Calender Agenda Rapat</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
 <style>
-/* Hover biru muda dengan border-radius untuk dropdown */
-      .dropdown-item:hover {
-        background-color: #5bc0de; /* biru muda */
-        color: white;
-        border-radius: 5px;
-      }
+.navbar { background-color: #c3c7ceff !important; }
+#sidebarToggle { 
+    background-color: #7a8ca0 !important;
+    width: 250px;
+    overflow: hidden; 
+    flex-shrink: 0;
+    transition: width 0.3s ease;
+}
+#sidebarToggle.collapse:not(.show) { width:0; }
+#sidebarToggle.collapse.show { width:250px; }
+#sidebarToggle.collapsing { width:0 !important; transition: width 0.3s ease; }
+.sidebar-nav { overflow-y: auto; height: 100%; }
+.sidebar-link:hover { background-color: #343a4041 !important; color: #fff !important; border-radius: 0.5rem; transition:0.3s; }
+main { transition:none; }
+.dropdown-menu { padding:0.4rem; overflow:hidden; }
+.dropdown-menu .dropdown-item { padding:0.55rem 1rem; border-radius:0.375rem; transition:0.2s; }
+.dropdown-menu .dropdown-item:hover { background-color:#d8f8fcff; color:#212529; }
+.dropdown-menu .dropdown-item.text-danger:hover { background-color:#fdecea; color:#dc3545; }
+.footer-custom { background-color:#e9ecef; color:#6c757d; }
+.card:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.25) !important; transform: translateY(-4px); transition:0.3s; }
+.active-link { background-color: #343a4041; border-radius:0.5rem; color:#fff !important; }
 </style>
+</head>
 <body class="d-flex flex-column min-vh-100">
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-secondary py-4">
-  <div class="container-fluid d-flex justify-content-center align-items-center position-relative">
-    <button class="btn btn-light position-absolute start-0 ms-5" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar">&#9776;</button>
-    <span class="navbar-brand mb-0 h1 text-center fs-1">Pengelolaan Rapat</span>
+<nav class="navbar navbar-expand-lg navbar-dark bg-secondary py-4 flex-shrink-0">
+<div class="container-fluid">
+  <button class="btn btn-light ms-4" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarToggle" style="width:50px; height:50px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+      <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+    </svg>
+  </button>
 
-    <div class="dropdown position-absolute end-0 me-5">
-      <button class="btn btn-light rounded-circle" type="button" id="profileDropdown" data-bs-toggle="dropdown" style="width:50px; height:50px;">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#333">
-          <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/>
-        </svg>
-      </button>
-      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
-        <li><a class="dropdown-item" href="Profil_user.php">Profil</a></li>
-        <li><a class="dropdown-item mt-2" href="../Logout.php">Logout</a></li>
-      </ul>
-    </div>
+  <div class="mx-auto position-absolute start-50 translate-middle-x">
+    <span class="navbar-brand fs-2 fw-bold text-dark">Pengelolaan Rapat</span>
   </div>
+
+  <div class="dropdown me-4">
+    <button class="btn btn-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" type="button" data-bs-toggle="dropdown" style="width:50px; height:50px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" fill="#333" viewBox="0 0 16 16">
+        <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+      </svg>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" href="Profil_user.php">Profil</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item text-danger" href="../Logout.php">Logout</a></li>
+    </ul>
+  </div>
+</div>
 </nav>
 
 <div class="d-flex flex-grow-1">
-  <!-- Sidebar -->
-  <div class="collapse collapse-horizontal" id="sidebar">
-    <div class="d-flex flex-column bg-dark text-white h-100" style="width:220px;">
-      <div class="d-flex flex-column mt-4 mb-5">
-        <a href="Home_user.php" class="btn btn-dark w-100 fs-4 mb-2 text-start ps-3">Home</a>
-        <a href="Rooms_user.php" class="btn btn-dark w-100 fs-4 mb-2 text-start ps-3">Meeting Rooms</a>
-        <a href="Calendars_user.php" class="btn btn-dark w-100 fs-4 mb-2 text-start ps-3">Calendars</a>
-        <a href="History_user.php" class="btn btn-dark w-100 fs-4 text-start ps-3">History</a>
-      </div>
-    </div>
+<div class="collapse collapse-horizontal show bg-dark min-vh-100 d-flex flex-column" id="sidebarToggle">
+  <div class="pt-3 sidebar-nav">
+    <a href="Home_user.php" class="nav-link text-white-50 text-decoration-none py-2 px-4 sidebar-link fs-4 h1 <?= ($current_page == 'Home_user.php') ? 'active-link' : '' ?>">Home</a>
+    <a href="Rooms_user.php" class="nav-link text-white-50 text-decoration-none py-2 px-4 sidebar-link fs-4 h1 <?= ($current_page == 'Rooms_user.php') ? 'active-link' : '' ?>">Meeting Rooms</a>
+    <a href="Calendars_user.php" class="nav-link text-white-50 text-decoration-none py-2 px-4 sidebar-link fs-4 h1 <?= ($current_page == 'Calendars_user.php') ? 'active-link' : '' ?>">Calendars</a>
+    <a href="History_user.php" class="nav-link text-white-50 text-decoration-none py-2 px-4 sidebar-link fs-4 h1 <?= ($current_page == 'History_user.php') ? 'active-link' : '' ?>">History</a>
   </div>
-
-  <!-- Main Content -->
-  <main class="col py-5">
-    <div class="card shadow-lg mx-auto" style="max-width: 900px;">
-      <div class="card-body">
-        <!-- Teks bulan besar -->
-        <h2 class="fs-1 my-4 text-center"><?= $namaBulan[$bulan] ?> <?= $tahun ?></h2>
-
-        <!-- Calendar table -->
-        <div class="table-responsive">
-          <table class="table table-bordered text-center mb-0">
-            <thead class="table-primary fs-5">
-              <tr>
-                <th>Min</th><th>Sen</th><th>Sel</th><th>Rab</th>
-                <th>Kam</th><th>Jum</th><th>Sab</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php
-              $hari_counter = 0;
-              echo "<tr>";
-              for ($i=0; $i<$hariAwal; $i++) { echo "<td class='py-4 px-3'></td>"; $hari_counter++; }
-
-              for ($tgl=1; $tgl<=$jumlahHari; $tgl++, $hari_counter++) {
-                if ($hari_counter % 7 == 0 && $tgl != 1) echo "</tr><tr>";
-
-                $kelas = ($tgl == date("j") && $bulan==date("n") && $tahun==date("Y")) ? "table-warning" : "";
-
-                if (isset($agenda[$tgl])) {
-                  echo "<td class='$kelas p-4'>";
-                  echo "<button type='button' class='btn btn-outline-success w-100 h-100 position-relative py-3 fs-5' data-bs-toggle='modal' data-bs-target='#agenda$tgl'>";
-                  echo $tgl;
-                  echo "<span class='position-absolute bottom-0 end-0 translate-middle p-2 bg-danger rounded-circle'></span>";
-                  echo "</button>";
-                  echo "</td>";
-                } else {
-                  echo "<td class='$kelas p-4 fs-5'>$tgl</td>";
-                }
-              }
-
-              while ($hari_counter % 7 !=0) { echo "<td class='p-4'></td>"; $hari_counter++; }
-              echo "</tr>";
-              ?>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </main>
 </div>
 
-<!-- Modal Statis -->
-<?php foreach($agenda as $tgl => $isi): ?>
-<div class="modal fade" id="agenda<?= $tgl ?>" tabindex="-1" aria-hidden="true">
+<main class="col py-5">
+  <div class="card shadow-lg mx-auto" style="max-width: 900px;">
+    <div class="card-body">
+
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="?bulan=<?= $prevBulan ?>&tahun=<?= $prevTahun ?>" class="btn btn-outline-primary">&laquo; Bulan Sebelumnya</a>
+        <h2 class="fs-1 text-center"><?= $namaBulan[$bulan] ?> <?= $tahun ?></h2>
+        <a href="?bulan=<?= $nextBulan ?>&tahun=<?= $nextTahun ?>" class="btn btn-outline-primary">Bulan Berikutnya &raquo;</a>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-bordered text-center mb-0">
+          <thead class="table-primary fs-5">
+            <tr><th>Min</th><th>Sen</th><th>Sel</th><th>Rab</th><th>Kam</th><th>Jum</th><th>Sab</th></tr>
+          </thead>
+          <tbody>
+          <?php
+            $hari_counter = 0;
+            echo "<tr>";
+            for($i=0;$i<$hariAwal;$i++){ echo "<td></td>"; $hari_counter++; }
+
+            for($tgl=1;$tgl<=$jumlahHari;$tgl++,$hari_counter++){
+              if($hari_counter%7==0 && $tgl!=1) echo "</tr><tr>";
+              
+              $kelas = ($tgl==date("j") && $bulan==date("n") && $tahun==date("Y")) ? "table-warning" : "";
+              $hasAgenda = isset($agenda[$tgl]);
+
+              if($hasAgenda){
+                  echo "<td class='$kelas py-3'>";
+                  echo "<button type='button' class='btn btn-outline-success w-50 h-75 position-relative py-2 fs-5' data-bs-toggle='modal' data-bs-target='#Agenda$tgl'>";
+                  echo $tgl;
+                  echo "<span class='position-absolute bottom-0 end-0 translate-middle p-1 bg-danger rounded-circle'></span>";
+                  echo "</button>";
+                  echo "</td>";
+              } else {
+                  echo "<td class='$kelas fs-5'>$tgl</td>";
+              }
+            }
+
+            while($hari_counter%7!=0){ echo "<td></td>"; $hari_counter++; }
+            echo "</tr>";
+          ?>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</main>
+</div>
+
+<?php
+foreach($agenda as $tgl => $agendas){
+?>
+<div class="modal fade" id="Agenda<?= $tgl ?>" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content border border-secondary rounded">
       <div class="modal-header justify-content-center">
         <h5 class="modal-title text-center w-100 fw-bold fs-4">Jadwal Rapat <?= $tgl ?> <?= $namaBulan[$bulan] ?> <?= $tahun ?></h5>
       </div>
-      <div class="modal-body text-center fs-4 py-5"><?= $isi ?></div>
+      <div class="modal-body text-center fs-5 py-3">
+        <ul class="list-group list-group-flush text-start">
+            <?php foreach($agendas as $data): 
+                $waktuMulai = date("H.i", strtotime($data['waktu']));
+                $waktuSelesai = date("H.i", strtotime($data['waktu'] . ' +3 hours'));
+            ?>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong class="d-block"><?= htmlspecialchars($data['judul']) ?></strong>
+                        <small class="text-muted">
+                            <i class="bi bi-clock"></i> <?= $waktuMulai ?> - <?= $waktuSelesai ?> WIB
+                            <span class="mx-2">|</span>
+                            <i class="bi bi-geo-alt"></i> <?= htmlspecialchars($data['lokasi']) ?>
+                        </small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="isi_user.php?project_id=<?= $data['project_id'] ?>" class="btn btn-sm btn-primary px-3">Detail</a>
+                    </div>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+      </div>
       <div class="modal-footer d-flex justify-content-center">
         <button type="button" class="btn btn-secondary fw-bold fs-5" data-bs-dismiss="modal">Tutup</button>
       </div>
     </div>
   </div>
 </div>
-<?php endforeach; ?>
+<?php } ?>
 
-<footer class="bg-dark text-white text-center py-3 mt-auto">
-    &copy; 2025 - Dashboard User
+<footer class="footer-custom text-center py-3 border-top mt-auto">
+    <div class="text-muted small">&copy; 2025 - User Pengelolaan Rapat</div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

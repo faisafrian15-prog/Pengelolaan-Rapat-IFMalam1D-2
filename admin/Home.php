@@ -1,323 +1,721 @@
 <?php
-// Home.php
-
 session_start();
+include "../koneksi.php";
 
-// Simulasi database (gunakan session agar data tetap sementara)
-if (!isset($_SESSION['rooms'])) {
-    $_SESSION['rooms'] = [
-        ['id'=>1,'name'=>'Projek Dinas','desc'=>'Dinas Pendidikan','badge'=>'Mendatang','badge_color'=>'warning','link'=>'Isi.php'],
-        ['id'=>2,'name'=>'Projek IT','desc'=>'Dinas Teknologi','badge'=>'Selesai','badge_color'=>'success','link'=>'Isi.php'],
-        ['id'=>3,'name'=>'Projek Infrastruktur','desc'=>'Dinas Pekerjaan Umum','badge'=>'Tertunda','badge_color'=>'danger','link'=>'Isi.php'],
-    ];
+if (empty($_SESSION['csrf'])) {
+$_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(32));
 }
 
-$rooms = $_SESSION['rooms'];
+$method = $_SERVER['REQUEST_METHOD'];
+$action = isset($_POST['action']) ? $_POST['action'] : '';
 
-// Tambah Projek
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action']==='create') {
-    $newId = end($rooms)['id'] + 1;
-    $rooms[] = [
-        'id' => $newId,
-        'name' => $_POST['name'],
-        'desc' => $_POST['desc'],
-        'badge' => $_POST['status'],
-        'badge_color' => $_POST['status'] === 'Mendatang' ? 'warning' : ($_POST['status'] === 'Selesai' ? 'success' : 'danger'),
-        'link' => 'Isi.php'
-    ];
-    $_SESSION['rooms'] = $rooms;
+function check_csrf() {
+    if (!isset($_POST['csrf']) || $_POST['csrf'] !== $_SESSION['csrf']) {
+        die("CSRF tidak valid");
+    }
+}
+
+if ($method === 'POST' && $action === 'create') {
+    check_csrf();
+
+    $name   = mysqli_real_escape_string($koneksi, $_POST['name']);
+    $desc   = mysqli_real_escape_string($koneksi, $_POST['desc']);
+    $status = mysqli_real_escape_string($koneksi, $_POST['status']);
+
+    mysqli_query($koneksi, "
+        INSERT INTO projects (name, description, status)
+        VALUES ('$name', '$desc', '$status')
+    ");
+
     header("Location: Home.php");
     exit;
 }
 
-// Edit Projek
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action']==='edit') {
-    foreach ($rooms as &$room) {
-        if ($room['id'] == $_POST['id']) {
-            $room['name'] = $_POST['name'];
-            $room['desc'] = $_POST['desc'];
-            $room['badge'] = $_POST['status'];
-            $room['badge_color'] = $_POST['status'] === 'Mendatang' ? 'warning' : ($_POST['status'] === 'Selesai' ? 'success' : 'danger');
+if ($method === 'POST' && $action === 'edit') {
+    check_csrf();
+
+    $id     = (int)$_POST['id'];
+    $name   = mysqli_real_escape_string($koneksi, $_POST['name']);
+    $desc   = mysqli_real_escape_string($koneksi, $_POST['desc']);
+    $status = mysqli_real_escape_string($koneksi, $_POST['status']);
+
+    mysqli_query($koneksi, "
+        UPDATE projects 
+        SET name='$name', description='$desc', status='$status'
+        WHERE id=$id
+    ");
+
+    header("Location: Home.php");
+    exit;
+}
+
+if ($method === 'POST' && $action === 'delete') {
+    check_csrf();
+
+    $id = (int)$_POST['id'];
+    mysqli_query($koneksi, "DELETE FROM projects WHERE id=$id");
+
+    header("Location: Home.php");
+    exit;
+}
+
+if ($method === 'POST' && $action === 'create_meeting') {
+    check_csrf();
+
+    $project_id = (int)$_POST['project_id'];
+    $judul      = mysqli_real_escape_string($koneksi, $_POST['judul']);
+    $tanggal    = $_POST['tanggal'];
+    $waktu      = $_POST['waktu'];
+    $lokasi     = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
+    $agenda     = mysqli_real_escape_string($koneksi, $_POST['agenda']);
+    $peserta    = mysqli_real_escape_string($koneksi, $_POST['peserta']);
+    $ppt        = mysqli_real_escape_string($koneksi, $_POST['ppt']);
+
+    mysqli_query($koneksi, "
+        INSERT INTO meetings (project_id, judul, tanggal, waktu, lokasi, agenda, peserta, ppt)
+        VALUES ($project_id, '$judul', '$tanggal', '$waktu', '$lokasi', '$agenda', '$peserta', '$ppt')
+    ");
+
+    header("Location: isi.php?project_id=$project_id");
+    exit;
+}
+
+$search = isset($_GET['query']) ? mysqli_real_escape_string($koneksi, $_GET['query']) : '';
+
+$sql = "SELECT * FROM projects";
+if ($search !== '') {
+    $sql .= " WHERE name LIKE '%$search%' 
+              OR description LIKE '%$search%' 
+              OR status LIKE '%$search%'";
+}
+$sql .= " ORDER BY id DESC";
+
+$data = mysqli_query($koneksi, $sql);
+
+$query_users = mysqli_query($koneksi, "SELECT * FROM daftar_peserta ORDER BY fullname ASC");
+
+$q_meetings = mysqli_query($koneksi, "SELECT lokasi, tanggal, waktu FROM meetings");
+$meetings_data = [];
+while ($m = mysqli_fetch_assoc($q_meetings)) {
+    $meetings_data[] = $m;
+}
+
+$q_rooms = mysqli_query($koneksi, "SELECT * FROM rooms_meeting ORDER BY room_name ASC");
+$rooms_data = [];
+
+$currentTime = time();
+
+while ($room = mysqli_fetch_assoc($q_rooms)) {
+    $isBooked = false;
+
+    foreach ($meetings_data as $meeting) {
+        if (
+            isset($meeting['lokasi'], $meeting['tanggal'], $meeting['waktu']) &&
+            $meeting['lokasi'] === $room['room_name']
+        ) {
+            $meetingDT = strtotime($meeting['tanggal'].' '.$meeting['waktu']);
+            if ($meetingDT >= $currentTime) {
+                $isBooked = true;
+                break;
+            }
         }
     }
-    $_SESSION['rooms'] = $rooms;
-    header("Location: Home.php");
-    exit;
+
+    $room['status'] = $isBooked ? 'booked' : 'available';
+    $rooms_data[] = $room;
 }
 
-// Hapus Projek
-if (isset($_GET['delete'])) {
-    $_SESSION['rooms'] = array_values(array_filter($rooms, function($r) {
-        return $r['id'] != $_GET['delete'];
-    }));
-    header("Location: Home.php");
-    exit;
-}
-
-// Search
-$search = isset($_GET['query']) ? $_GET['query'] : '';
-$filteredRooms = [];
-foreach ($rooms as $room) {
-    if ($search === '' ||
-        stripos($room['name'], $search) !== false ||
-        stripos($room['desc'], $search) !== false ||
-        stripos($room['badge'], $search) !== false) {
-        $filteredRooms[] = $room;
-    }
-}
+$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rencana Rapat</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .dropdown-item:hover {
-            background-color: #5bc0de;
-            color: white;
-            border-radius: 5px;
-        }
-        .card:hover {
-            transform: scale(1.03);
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-        .card-footer,
-        .card-footer * {
-            position: relative;
-            z-index: 5;
-        }
+    .navbar { background-color: #c3c7ceff !important; }
+    
+    #sidebarToggle { 
+        background-color: #7a8ca0 !important;
+        width: 250px;
+        overflow: hidden; 
+        flex-shrink: 0;
+        transition: width 0.3s ease;
+    }
+    #sidebarToggle.collapse:not(.show) { width:0; }
+    #sidebarToggle.collapse.show { width:250px; }
+    #sidebarToggle.collapsing { width:0 !important; transition: width 0.3s ease; }
+    .sidebar-nav { overflow-y: auto; height: 100%; }
+    .sidebar-link:hover { background-color: #343a4041 !important; color: #fff !important; border-radius: 0.5rem; transition:0.3s; }
+    
+    main { transition:none; }
+    .dropdown-menu { padding:0.4rem; overflow:hidden; }
+    .dropdown-menu .dropdown-item { padding:0.55rem 1rem; border-radius:0.375rem; transition:0.2s; }
+    .dropdown-menu .dropdown-item:hover { background-color:#d8f8fcff; color:#212529; }
+    .dropdown-menu .dropdown-item.text-danger:hover { background-color:#fdecea; color:#dc3545; }
+    .footer-custom { background-color:#e9ecef; color:#6c757d; }
+    .card:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.25) !important; transform: translateY(-4px); transition:0.3; cursor: pointer; }
+    .active-link { background-color: #343a4041; border-radius:0.5rem; color:#fff !important; }
+
+    .participant-dropdown-menu {
+        width: 100%;
+        padding: 10px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .participant-list {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 5px;
+    }
+    .participant-item {
+        padding: 5px 10px;
+        border-bottom: 1px solid #f1f1f1;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .participant-item:hover {
+        background-color: #f8f9fa;
+    }
+    .participant-item:last-child {
+        border-bottom: none;
+    }
+    .participant-label {
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+    
+    option:disabled {
+        color: #dc3545 !important;
+        background-color: #f8d7da !important;
+        font-weight: bold !important;
+        font-style: italic !important;
+        cursor: not-allowed !important;
+    }
+    
+    select option:disabled {
+        opacity: 0.6;
+    }
     </style>
 </head>
+
 <body class="d-flex flex-column min-vh-100 bg-light">
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-secondary py-4">
-    <div class="container-fluid d-flex justify-content-center align-items-center position-relative">
-        <button class="btn btn-light position-absolute start-0 ms-5" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar">&#9776;</button>
-        <span class="navbar-brand mb-0 h1 text-center fs-1">Pengelolaan Rapat</span>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-secondary py-4 flex-shrink-0">
+<div class="container-fluid">
+  <button class="btn btn-light ms-4" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarToggle" style="width:50px; height:50px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+      <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+    </svg>
+  </button>
 
-        <div class="dropdown position-absolute end-0 me-5">
-            <button class="btn btn-light rounded-circle" type="button" id="profileDropdown" data-bs-toggle="dropdown" style="width:50px; height:50px;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#333">
-                    <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/>
-                </svg>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
-                <li><a class="dropdown-item" href="Profil.php">Profil</a></li>
-                <li><a class="dropdown-item mt-2" href="../Logout.php">Logout</a></li>
-            </ul>
-        </div>
-    </div>
+  <div class="mx-auto position-absolute start-50 translate-middle-x">
+    <span class="navbar-brand fs-2 fw-bold text-dark">Pengelolaan Rapat</span>
+  </div>
+
+  <div class="dropdown me-4">
+    <button class="btn btn-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" type="button" data-bs-toggle="dropdown" style="width:50px; height:50px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" fill="#333" viewBox="0 0 16 16">
+        <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+      </svg>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" href="Profil.php">Profil</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item text-danger" href="../Logout.php">Logout</a></li>
+    </ul>
+  </div>
+</div>
 </nav>
 
-<!-- Sidebar + Main Content -->
 <div class="d-flex flex-grow-1">
 
-    <!-- Sidebar -->
-    <div class="collapse collapse-horizontal" id="sidebar">
-        <div class="d-flex flex-column bg-dark text-white h-100" style="width:220px;">
-            <div class="d-flex flex-column mt-4 mb-5">
-                <a href="Home.php" class="btn btn-dark w-100 fs-4 mb-2 text-start ps-3">Home</a>
-                <a href="Rooms.php" class="btn btn-dark w-100 fs-4 mb-2 text-start ps-3">Meeting Rooms</a>
-                <a href="Calendars.php" class="btn btn-dark w-100 fs-4 mb-2 text-start ps-3">Calendars</a>
-                <a href="History.php" class="btn btn-dark w-100 fs-4 text-start ps-3">History</a>
+<div class="collapse collapse-horizontal show bg-dark min-vh-100 d-flex flex-column" id="sidebarToggle">
+  <div class="pt-3 sidebar-nav">
+    <a href="Home.php" class="nav-link text-white-50 text-decoration-none py-2 px-4 sidebar-link fs-4 h1 <?= ($current_page == 'Home.php') ? 'active-link' : '' ?>">Home</a>
+    <a href="Rooms.php" class="nav-link text-white-50 text-decoration-none py-2 px-4 sidebar-link fs-4 h1 <?= ($current_page == 'Rooms.php') ? 'active-link' : '' ?>">Meeting Rooms</a>
+    <a href="Calendars.php" class="nav-link text-white-50 text-decoration-none py-2 px-4 sidebar-link fs-4 h1 <?= ($current_page == 'Calendars.php') ? 'active-link' : '' ?>">Calendars</a>
+    <a href="History.php" class="nav-link text-white-50 text-decoration-none py-2 px-4 sidebar-link fs-4 h1 <?= ($current_page == 'History.php') ? 'active-link' : '' ?>">History</a>
+    <a href="detail.php" class="nav-link text-white-50 text-decoration-none py-2 px-4 sidebar-link fs-4 h1 <?= ($current_page == 'detail.php') ? 'active-link' : '' ?>">Detail</a>
+  </div>
+</div>
+
+        <main class="container my-4 d-flex flex-column flex-grow-1">
+
+            <div class="d-flex justify-content-center mb-5">
+                
+                <button type="button"
+                        class="btn btn-success btn-lg me-3"
+                        data-bs-toggle="modal"
+                        data-bs-target="#createModal">
+                    + Tambah
+                </button>
+
+                <form method="get" action="" style="position: relative;" class="w-50">
+                    <div class="input-group">
+                        <input type="text" 
+                               name="query" 
+                               class="form-control form-control-lg" 
+                               placeholder="Cari nama, deskripsi, atau status..." 
+                               value="<?= htmlspecialchars($search) ?>">
+                        
+                        <?php if ($search !== ''): ?>
+                            <span onclick="window.location='Home.php'" 
+                                  class="position-absolute" 
+                                  style="right: 100px; top:50%; transform:translateY(-50%); cursor:pointer; font-weight:bold; font-size:1.25rem; color:#495057; user-select:none; z-index: 10;" 
+                                  title="Hapus pencarian">&times;</span>
+                        <?php endif; ?>
+
+                        <button class="btn btn-primary btn-lg" type="submit">Search</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="row g-4">
+                <?php 
+                if (mysqli_num_rows($data) === 0): 
+                ?>
+                    <div class="col-12 text-center">
+                        <p class="fs-4 text-muted">Tidak ada jadwal rapat</p>
+                    </div>
+                <?php 
+                else: 
+                    while ($row = mysqli_fetch_assoc($data)): 
+                        
+                        $currentStatus = $row['status'];
+                        $displayStatus = $currentStatus;
+
+                        $qMeet = mysqli_query($koneksi, "SELECT * FROM meetings WHERE project_id = " . $row['id'] . " ORDER BY tanggal DESC, waktu DESC LIMIT 1");
+                        $lastMeeting = mysqli_fetch_assoc($qMeet);
+
+                        if ($lastMeeting && $currentStatus != 'Tertunda' && $currentStatus != 'Dibatalkan') {
+                            $meetDateTime = strtotime($lastMeeting['tanggal'] . ' ' . $lastMeeting['waktu']);
+                            $now = time();
+
+                            if ($meetDateTime < $now) {
+                                $displayStatus = 'Selesai';
+                            } else {
+                                $displayStatus = 'Mendatang';
+                            }
+                            
+                            if ($displayStatus !== $currentStatus) {
+                                mysqli_query($koneksi, "UPDATE projects SET status = '$displayStatus' WHERE id = " . $row['id']);
+                            }
+                        }
+                        
+                        if ($displayStatus == 'Mendatang') {
+                            $color = 'warning'; 
+                        } elseif ($displayStatus == 'Selesai') {
+                            $color = 'success'; 
+                        } elseif ($displayStatus == 'Tertunda') {
+                            $color = 'secondary'; 
+                        } elseif ($displayStatus == 'Dibatalkan') {
+                            $color = 'danger'; 
+                        } else {
+                            $color = 'secondary'; 
+                        }
+                ?>
+                
+                <div class="col-md-6 col-lg-3 d-flex">
+                    <div class="card h-100 w-100"
+                         onclick="window.location='isi.php?project_id=<?= $row['id'] ?>'">
+                        
+                        <div class="card-body py-5">
+                            <h5><?= htmlspecialchars($row['name']) ?></h5>
+                            <p class="text-truncate"><?= htmlspecialchars($row['description']) ?></p>
+                        </div>
+
+                        <span class="badge bg-<?= $color ?> ms-3 mb-2 align-self-start px-2 py-1" 
+                              style="font-size: 0.75rem;">
+                            <?= $displayStatus ?>
+                        </span>
+
+                        <div class="card-footer d-flex justify-content-between bg-white border-top-0">
+                            <button class="btn btn-warning btn-sm"
+                                    onclick="event.stopPropagation()"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#edit<?= $row['id'] ?>">
+                                Edit
+                            </button>
+
+                            <form method="POST"
+                                  onclick="event.stopPropagation()"
+                                  onsubmit="return confirm('Yakin hapus?')">
+                                <input type="hidden" name="csrf" value="<?= $_SESSION['csrf'] ?>">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="id" value="<?= $row['id'] ?>">
+                                <button class="btn btn-danger btn-sm">Hapus</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="edit<?= $row['id'] ?>">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST">
+                                <input type="hidden" name="csrf" value="<?= $_SESSION['csrf'] ?>">
+                                <input type="hidden" name="action" value="edit">
+                                <input type="hidden" name="id" value="<?= $row['id'] ?>">
+
+                                <div class="modal-header">
+                                    <h5>Edit Projek</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Nama Project</label>
+                                        <input class="form-control" 
+                                               name="name" 
+                                               value="<?= htmlspecialchars($row['name']) ?>" 
+                                               required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Deskripsi</label>
+                                        <textarea class="form-control" 
+                                                  name="desc" 
+                                                  required><?= htmlspecialchars($row['description']) ?></textarea>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Status</label>
+                                        <select name="status" class="form-select">
+                                            <option>Tertunda</option>
+                                            <option>Dibatalkan</option>
+                                        </select>
+                                        <small class="text-muted">Status Mendatang & Selesai dihitung otomatis dari jadwal rapat terakhir.</small>
+                                    </div>
+                                </div>
+
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                    <button type="submit" class="btn btn-success">Simpan</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <?php endwhile; ?>
+                <?php endif; ?>
+            </div>
+
+        </main>
+    </div>
+
+    <div class="modal fade" id="createModal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" 
+                                data-bs-toggle="tab" 
+                                data-bs-target="#projectTab">
+                            Project
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" 
+                                data-bs-toggle="tab" 
+                                data-bs-target="#isiTab">
+                            Isi Rapat
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+
+                    <div class="tab-pane fade show active p-4" id="projectTab">
+                        <form method="POST">
+                            <input type="hidden" name="csrf" value="<?= $_SESSION['csrf'] ?>">
+                            <input type="hidden" name="action" value="create">
+
+                            <div class="mb-3">
+                                <label class="form-label">Nama Project</label>
+                                <input class="form-control" name="name" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Deskripsi</label>
+                                <textarea class="form-control" name="desc" required></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Status</label>
+                                <input type="text" class="form-control" value="Mendatang" disabled>
+                                <input type="hidden" name="status" value="Mendatang">
+                            </div>
+
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-success">Simpan Project</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="tab-pane fade p-4" id="isiTab">
+                        <form method="POST">
+                            <input type="hidden" name="csrf" value="<?= $_SESSION['csrf'] ?>">
+                            <input type="hidden" name="action" value="create_meeting">
+
+                            <div class="mb-3">
+                                <label class="form-label">Project</label>
+                                <select name="project_id" class="form-select" required>
+                                    <?php
+                                    $q = mysqli_query($koneksi, "SELECT id, name FROM projects");
+                                    while ($p = mysqli_fetch_assoc($q)):
+                                    ?>
+                                        <option value="<?= $p['id'] ?>">
+                                            <?= htmlspecialchars($p['name']) ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Judul</label>
+                                <input class="form-control" name="judul" required>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Hari / Tanggal</label>
+                                    <input type="date" class="form-control" name="tanggal" id="inputTanggal" required>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Waktu</label>
+                                    <input type="time" class="form-control" name="waktu" id="inputWaktu" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Lokasi</label>
+                                <select name="lokasi" id="selectLokasi" class="form-select" required>
+                                    <option value="" selected disabled>Pilih Lokasi Ruangan</option>
+                                    <?php foreach ($rooms_data as $r): ?>
+                                        <option value="<?= htmlspecialchars($r['room_name']) ?>" 
+                                                <?= ($r['status'] === 'booked') ? 'disabled' : '' ?>>
+                                            <?= htmlspecialchars($r['room_name']) ?>
+                                            <?= ($r['status'] === 'booked') ? ' (TERBOOKING - Tidak Tersedia)' : '' ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-danger fw-bold">
+                                    ⚠️ Ruangan dengan status TERBOOKING tidak bisa dipilih karena sudah ada jadwal rapat.
+                                </small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Agenda</label>
+                                <textarea class="form-control" name="agenda" rows="3"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Daftar Peserta</label>
+                                
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center" 
+                                            type="button" 
+                                            id="pesertaDropdownBtn" 
+                                            data-bs-toggle="dropdown" 
+                                            data-bs-auto-close="outside" 
+                                            aria-expanded="false">
+                                        <span id="selectedPesertaLabel">Pilih Peserta...</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                                        </svg>
+                                    </button>
+                                    
+                                    <ul class="dropdown-menu participant-dropdown-menu" aria-labelledby="pesertaDropdownBtn">
+                                        <li class="p-2 border-bottom" onclick="event.stopPropagation()">
+                                            <input type="text" class="form-control form-control-sm" id="searchPesertaInput" placeholder="Cari Nama atau NIK...">
+                                        </li>
+                                        
+                                        <li class="participant-list" id="pesertaListContainer">
+                                            <?php 
+                                            mysqli_data_seek($query_users, 0); 
+                                            if ($query_users && mysqli_num_rows($query_users) > 0): 
+                                                while($u = mysqli_fetch_assoc($query_users)): ?>
+                                                    
+                                                    <div class="participant-item" onclick="event.stopPropagation()">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input peserta-checkbox" 
+                                                                   type="checkbox" 
+                                                                   value="<?= htmlspecialchars($u['fullname']) ?>" 
+                                                                   id="peserta_<?= $u['id'] ?>"
+                                                                   data-name="<?= htmlspecialchars($u['fullname']) ?>"
+                                                                   data-nik="<?= htmlspecialchars($u['nik']) ?>">
+                                                            
+                                                            <label class="participant-label" for="peserta_<?= $u['id'] ?>">
+                                                                <div class="d-flex flex-column">
+                                                                    <strong><?= htmlspecialchars($u['fullname']) ?></strong>
+                                                                    <small class="text-muted">NIK: <?= htmlspecialchars($u['nik']) ?></small>
+                                                                </div>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                <?php endwhile; 
+                                            else: ?>
+                                                <div class="text-center p-2 text-danger small">
+                                                    Tidak ada data peserta.<br>
+                                                    Pastikan tabel 'daftar_peserta' ada dan memiliki kolom 'id', 'fullname', dan 'nik'.
+                                                </div>
+                                            <?php endif; ?>
+                                        </li>
+                                    </ul>
+
+                                    <input type="hidden" name="peserta" id="inputHiddenPeserta">
+                                </div>
+                                <small class="text-muted">Centang nama peserta di atas (Bisa pilih banyak).</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">PPT / Slide (Link)</label>
+                                <input class="form-control" 
+                                       name="ppt" 
+                                       placeholder="https://...">
+                            </div>
+
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary">Simpan Isi Rapat</button>
+                            </div>
+                        </form>
+                    </div>
+
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Main Content -->
-    <main class="container my-4 d-flex flex-column flex-grow-1">
+    <footer class="footer-custom text-center py-3 border-top mt-auto">
+        <div class="text-muted small">&copy; 2025 - Admin Pengelolaan Rapat</div>
+    </footer>
 
-        <!-- Search + Create -->
-        <div class="d-flex justify-content-center align-items-center mt-4 mb-5">
-            <button type="button" class="btn btn-success btn-lg me-3" data-bs-toggle="modal" data-bs-target="#createModal">
-                + Tambah
-            </button>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-            <form class="d-flex w-50" method="get" action="Home.php">
-                <div class="input-group w-100">
-                    <input type="text" name="query" class="form-control form-control-lg border border-2 border-dark-subtle"
-                        placeholder="Cari nama, deskripsi, atau status..." value="<?= htmlspecialchars($search) ?>">
-                    <?php if ($search !== ''): ?>
-                        <button type="button" class="btn btn-outline-secondary border border-2 border-dark-subtle"
-                            style="padding:0 0.5rem; font-weight:bold; font-size:1.25rem;"
-                            onclick="window.location='Home.php'">×</button>
-                    <?php endif; ?>
-                    <button type="submit" class="btn btn-primary btn-lg">Search</button>
-                </div>
-            </form>
-        </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchPesertaInput');
+            const checkboxes = document.querySelectorAll('.peserta-checkbox');
+            const hiddenInput = document.getElementById('inputHiddenPeserta');
+            const labelBtn = document.getElementById('selectedPesertaLabel');
 
-        <!-- Cards -->
-        <div class="row g-4 justify-content-start">
-            <?php if (count($filteredRooms) === 0): ?>
-                <div class="col-12 text-center"><p class="fs-5 text-muted">Tidak ada hasil ditemukan.</p></div>
-            <?php else: ?>
-                <?php foreach($filteredRooms as $room): ?>
-                    <div class="col-md-6 col-lg-3 d-flex">
-                        <div class="card h-100 shadow-sm position-relative d-flex flex-column justify-content-between w-100">
-                            <div class="card-body py-5">
-                                <h5 class="card-title fs-5"><?= htmlspecialchars($room['name']) ?></h5>
-                                <p class="card-text fs-6"><?= htmlspecialchars($room['desc']) ?></p>
+            searchInput.addEventListener('keyup', function(e) {
+                const term = e.target.value.toLowerCase();
+                checkboxes.forEach(function(chk) {
+                    const container = chk.closest('.participant-item');
+                    const name = chk.getAttribute('data-name').toLowerCase();
+                    const nik = chk.getAttribute('data-nik').toLowerCase();
+                    
+                    if (name.includes(term) || nik.includes(term)) {
+                        container.classList.remove('d-none');
+                    } else {
+                        container.classList.add('d-none');
+                    }
+                });
+            });
 
-                                <!-- Klik card untuk buka Isi.php -->
-                                <a href="<?= htmlspecialchars($room['link'] . '?id=' . $room['id']) ?>" class="stretched-link"></a>
-                            </div>
-                            <span class="badge bg-<?= htmlspecialchars($room['badge_color']) ?> m-3 align-self-start"><?= htmlspecialchars($room['badge']) ?></span>
+            function updatePesertaValue() {
+                let selectedNames = [];
+                checkboxes.forEach(function(chk) {
+                    if (chk.checked) {
+                        selectedNames.push(chk.value);
+                    }
+                });
 
-                            <div class="card-footer d-flex justify-content-between">
-                                <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editModal<?= $room['id'] ?>">Edit</button>
-                                <a href="Home.php?delete=<?= $room['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Yakin ingin menghapus?')">Hapus</a>
-                            </div>
-                        </div>
-                    </div>
+                hiddenInput.value = selectedNames.join(', ');
 
-                    <!-- Modal Edit -->
-                    <div class="modal fade" id="editModal<?= $room['id'] ?>" tabindex="-1" aria-labelledby="editModalLabel<?= $room['id'] ?>" aria-hidden="true">
-                      <div class="modal-dialog">
-                        <div class="modal-content">
-                          <form method="POST" action="Home.php">
-                            <input type="hidden" name="action" value="edit">
-                            <input type="hidden" name="id" value="<?= $room['id'] ?>">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="editModalLabel<?= $room['id'] ?>">Edit Projek</h5>
-                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
-                            </div>
-                            <div class="modal-body">
-                              <div class="mb-3">
-                                <label class="form-label">Nama Projek</label>
-                                <input type="text" name="name" class="form-control" required value="<?= htmlspecialchars($room['name']) ?>">
-                              </div>
-                              <div class="mb-3">
-                                <label class="form-label">Deskripsi</label>
-                                <textarea name="desc" class="form-control" rows="3" required><?= htmlspecialchars($room['desc']) ?></textarea>
-                              </div>
-                              <div class="mb-3">
-                                <label class="form-label">Status</label>
-                                <select name="status" class="form-select" required>
-                                  <option value="Mendatang" <?= $room['badge']=='Mendatang'?'selected':'' ?>>Mendatang</option>
-                                  <option value="Selesai" <?= $room['badge']=='Selesai'?'selected':'' ?>>Selesai</option>
-                                  <option value="Tertunda" <?= $room['badge']=='Tertunda'?'selected':'' ?>>Tertunda</option>
-                                </select>
-                              </div>
-                            </div>
-                            <div class="modal-footer">
-                              <button type="submit" class="btn btn-success">Simpan Perubahan</button>
-                            </div>
-                          </form>
-                        </div>
-                      </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </main>
-</div>
+                if (selectedNames.length > 0) {
+                    if (selectedNames.length <= 2) {
+                        labelBtn.textContent = selectedNames.join(', ');
+                    } else {
+                        labelBtn.textContent = selectedNames.length + ' Orang Terpilih';
+                    }
+                    labelBtn.classList.add('text-dark');
+                } else {
+                    labelBtn.textContent = 'Pilih Peserta...';
+                    labelBtn.classList.remove('text-dark');
+                }
+            }
 
-<!-- Footer -->
-<footer class="bg-dark text-white text-center py-3 mt-auto w-100">
-    &copy; 2025 - Dashboard Admin
-</footer>
+            checkboxes.forEach(function(chk) {
+                chk.addEventListener('change', updatePesertaValue);
+            });
+        });
+    </script>
 
-<!-- Modal Create dengan Tabs (Projek & Jadwal Rapat) -->
-<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="createModalLabel">Tambah Data Baru</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
-      </div>
-      <div class="modal-body">
-        <!-- Tabs -->
-        <ul class="nav nav-tabs mb-3" id="createTabs" role="tablist">
-          <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="projek-tab" data-bs-toggle="tab" data-bs-target="#projek" type="button" role="tab">Tambah Projek</button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="rapat-tab" data-bs-toggle="tab" data-bs-target="#rapat" type="button" role="tab">Tambah Jadwal Rapat</button>
-          </li>
-        </ul>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const bookedData = <?php echo json_encode($meetings_data, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>;
+            
+            const dateInput = document.getElementById('inputTanggal');
+            const timeInput = document.getElementById('inputWaktu');
+            const roomSelect = document.getElementById('selectLokasi');
 
-        <div class="tab-content" id="createTabsContent">
-          <!-- Form Tambah Projek -->
-          <div class="tab-pane fade show active" id="projek" role="tabpanel">
-            <form method="POST" action="Home.php">
-              <input type="hidden" name="action" value="create">
-              <div class="mb-3">
-                <label class="form-label">Nama Projek</label>
-                <input type="text" name="name" class="form-control" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Deskripsi</label>
-                <textarea name="desc" class="form-control" rows="3" required></textarea>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Status</label>
-                <select name="status" class="form-select" required>
-                  <option value="Mendatang">Mendatang</option>
-                  <option value="Selesai">Selesai</option>
-                  <option value="Tertunda">Tertunda</option>
-                </select>
-              </div>
-              <div class="modal-footer">
-                <button type="submit" class="btn btn-success">💾 Simpan Projek</button>
-              </div>
-            </form>
-          </div>
+            function updateRoomAvailability() {
+                const selectedDate = dateInput.value;
+                const selectedTime = timeInput.value;
 
-          <!-- Form Tambah Jadwal Rapat -->
-          <div class="tab-pane fade" id="rapat" role="tabpanel">
-            <form method="POST" action="Isi.php">
-              <input type="hidden" name="action" value="create_rapat">
-              <div class="row">
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">Judul Rapat</label>
-                    <input type="text" name="judul" class="form-control" required>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label">Hari / Tanggal</label>
-                    <input type="date" name="tanggal" class="form-control" required>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label">Waktu</label>
-                    <input type="text" name="waktu" class="form-control" placeholder="Contoh: 10:00 - 12:00 WIB" required>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label">Lokasi</label>
-                    <input type="text" name="lokasi" class="form-control" required>
-                  </div>
-                </div>
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">Agenda</label>
-                    <textarea name="agenda" class="form-control" rows="3" required></textarea>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label">Daftar Peserta</label>
-                    <textarea name="peserta" class="form-control" rows="3" placeholder="Pisahkan dengan koma" required></textarea>
-                    <small class="text-muted">Gunakan koma untuk memisahkan nama peserta</small>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label">Slide / PPT</label>
-                    <input type="text" name="ppt" class="form-control" placeholder="Nama file atau URL lengkap">
-                  </div>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="submit" class="btn btn-success">💾 Simpan Jadwal Rapat</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+                const bookingKeys = new Set();
+                
+                bookedData.forEach(booking => {
+                    if(booking.tanggal && booking.waktu && booking.lokasi) {
+                        const timePart = booking.waktu.substring(0, 5); 
+                        const roomPart = booking.lokasi.trim().toLowerCase();
+                        
+                        const key = `${booking.tanggal}|${timePart}|${roomPart}`;
+                        bookingKeys.add(key);
+                    }
+                });
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+                Array.from(roomSelect.options).forEach(opt => {
+                    opt.disabled = false;
+                    opt.text = opt.text.split(' (')[0];
+                });
+                
+                if(roomSelect.options[0].value === "") roomSelect.options[0].disabled = true;
+
+                if (!selectedDate || !selectedTime) return;
+
+                let currentlySelectedRoom = roomSelect.value;
+                let isSelectionInvalid = false;
+
+                Array.from(roomSelect.options).forEach(opt => {
+                    if(opt.value === "") return;
+
+                    const optRoom = opt.value.trim().toLowerCase();
+                    const searchKey = `${selectedDate}|${selectedTime}|${optRoom}`;
+
+                    if (bookingKeys.has(searchKey)) {
+                        opt.disabled = true;
+                        opt.text += " (TERBOOKING)";
+                        
+                        if (currentlySelectedRoom && opt.value.toLowerCase() === currentlySelectedRoom.toLowerCase()) {
+                            isSelectionInvalid = true;
+                        }
+                    }
+                });
+
+                if (isSelectionInvalid) {
+                    roomSelect.value = "";
+                    alert("Ruangan yang Anda pilih sudah terbooking pada jam tersebut. Silakan pilih ruangan lain.");
+                }
+            }
+
+            dateInput.addEventListener('change', updateRoomAvailability);
+            timeInput.addEventListener('change', updateRoomAvailability);
+        });
+    </script>
 </body>
 </html>
