@@ -1,6 +1,6 @@
 <?php
 session_start();
-include "../koneksi.php"; 
+include "../Koneksi.php"; 
 
 if (!isset($_SESSION['username']) || !isset($_SESSION['role'])) {
     header("Location: ../Login.php");

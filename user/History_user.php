@@ -1,6 +1,6 @@
 <?php
 session_start();
-include "../koneksi.php";
+include "../Koneksi.php";
 
 $current_page = basename($_SERVER['PHP_SELF']);
 

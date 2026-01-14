@@ -1,6 +1,6 @@
 <?php
 session_start();
-include "../koneksi.php";
+include "../Koneksi.php";
 
 if (empty($_SESSION['csrf'])) {
     $_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(32));

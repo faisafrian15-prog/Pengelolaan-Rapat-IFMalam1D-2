@@ -1,5 +1,5 @@
 <?php
-include "../koneksi.php"; 
+include "../Koneksi.php"; 
 
 try {
     if (isset($_POST['action']) && $_POST['action'] === 'delete') {

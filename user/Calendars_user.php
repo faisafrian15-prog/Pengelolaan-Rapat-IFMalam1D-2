@@ -1,6 +1,6 @@
 <?php
 session_start();
-include "../koneksi.php";
+include "../Koneksi.php";
 
 function isUserLoggedIn() {
     return isset($_SESSION['username']) && isset($_SESSION['role']);

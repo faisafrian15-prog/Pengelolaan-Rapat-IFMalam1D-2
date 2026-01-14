@@ -1,5 +1,5 @@
 <?php
-include "../koneksi.php";
+include "../Koneksi.php";
 
 $search = isset($_GET['query']) ? trim($_GET['query']) : '';
 
