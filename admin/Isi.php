@@ -323,6 +323,7 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <form method="POST" action="isi.php">
+                        <input type="hidden" name="csrf" value="<?= $_SESSION['csrf'] ?>">
                         <input type="hidden" name="action" value="update_meeting">
                         <input type="hidden" name="id" value="<?= $row['id'] ?>">
                         <input type="hidden" name="project_id" value="<?= $project_id ?>">
@@ -450,6 +451,7 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
             <div class="modal-dialog">
                 <div class="modal-content">
                     <form method="POST" action="isi.php">
+                        <input type="hidden" name="csrf" value="<?= $_SESSION['csrf'] ?>">
                         <input type="hidden" name="action" value="delete_meeting">
                         <input type="hidden" name="id" value="<?= $row['id'] ?>">
                         <input type="hidden" name="project_id" value="<?= $project_id ?>">
