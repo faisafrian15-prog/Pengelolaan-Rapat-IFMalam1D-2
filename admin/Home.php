@@ -3,7 +3,7 @@ session_start();
 include "../koneksi.php";
 
 if (empty($_SESSION['csrf'])) {
-$_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(32));
+    $_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(32));
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -15,69 +15,77 @@ function check_csrf() {
     }
 }
 
-if ($method === 'POST' && $action === 'create') {
-    check_csrf();
-
-    $name   = mysqli_real_escape_string($koneksi, $_POST['name']);
-    $desc   = mysqli_real_escape_string($koneksi, $_POST['desc']);
-    $status = mysqli_real_escape_string($koneksi, $_POST['status']);
-
-    mysqli_query($koneksi, "
-        INSERT INTO projects (name, description, status)
-        VALUES ('$name', '$desc', '$status')
-    ");
-
-    header("Location: Home.php");
-    exit;
+function runQuery($koneksi, $sql, $redirect = null) {
+    try {
+        $result = mysqli_query($koneksi, $sql);
+        if (!$result) {
+            throw new Exception("Database Error: " . mysqli_error($koneksi) . " | Query: " . $sql);
+        }
+        return $result;
+    } catch (Exception $e) {
+        error_log($e->getMessage(), 3, __DIR__ . '/db_errors.log');
+        echo "<div class='alert alert-danger'>Terjadi kesalahan pada database. Silakan hubungi admin.</div>";
+        exit;
+    }
 }
 
-if ($method === 'POST' && $action === 'edit') {
+if ($method === 'POST') {
     check_csrf();
 
-    $id     = (int)$_POST['id'];
-    $name   = mysqli_real_escape_string($koneksi, $_POST['name']);
-    $desc   = mysqli_real_escape_string($koneksi, $_POST['desc']);
-    $status = mysqli_real_escape_string($koneksi, $_POST['status']);
+    switch($action) {
+        case 'create':
+            $name   = mysqli_real_escape_string($koneksi, $_POST['name']);
+            $desc   = mysqli_real_escape_string($koneksi, $_POST['desc']);
+            $status = mysqli_real_escape_string($koneksi, $_POST['status']);
 
-    mysqli_query($koneksi, "
-        UPDATE projects 
-        SET name='$name', description='$desc', status='$status'
-        WHERE id=$id
-    ");
+            runQuery($koneksi, "
+                INSERT INTO projects (name, description, status)
+                VALUES ('$name', '$desc', '$status')
+            ");
 
-    header("Location: Home.php");
-    exit;
-}
+            header("Location: Home.php");
+            exit;
 
-if ($method === 'POST' && $action === 'delete') {
-    check_csrf();
+        case 'edit':
+            $id     = (int)$_POST['id'];
+            $name   = mysqli_real_escape_string($koneksi, $_POST['name']);
+            $desc   = mysqli_real_escape_string($koneksi, $_POST['desc']);
+            $status = mysqli_real_escape_string($koneksi, $_POST['status']);
 
-    $id = (int)$_POST['id'];
-    mysqli_query($koneksi, "DELETE FROM projects WHERE id=$id");
+            runQuery($koneksi, "
+                UPDATE projects 
+                SET name='$name', description='$desc', status='$status'
+                WHERE id=$id
+            ");
 
-    header("Location: Home.php");
-    exit;
-}
+            header("Location: Home.php");
+            exit;
 
-if ($method === 'POST' && $action === 'create_meeting') {
-    check_csrf();
+        case 'delete':
+            $id = (int)$_POST['id'];
+            runQuery($koneksi, "DELETE FROM projects WHERE id=$id");
 
-    $project_id = (int)$_POST['project_id'];
-    $judul      = mysqli_real_escape_string($koneksi, $_POST['judul']);
-    $tanggal    = $_POST['tanggal'];
-    $waktu      = $_POST['waktu'];
-    $lokasi     = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
-    $agenda     = mysqli_real_escape_string($koneksi, $_POST['agenda']);
-    $peserta    = mysqli_real_escape_string($koneksi, $_POST['peserta']);
-    $ppt        = mysqli_real_escape_string($koneksi, $_POST['ppt']);
+            header("Location: Home.php");
+            exit;
 
-    mysqli_query($koneksi, "
-        INSERT INTO meetings (project_id, judul, tanggal, waktu, lokasi, agenda, peserta, ppt)
-        VALUES ($project_id, '$judul', '$tanggal', '$waktu', '$lokasi', '$agenda', '$peserta', '$ppt')
-    ");
+        case 'create_meeting':
+            $project_id = (int)$_POST['project_id'];
+            $judul      = mysqli_real_escape_string($koneksi, $_POST['judul']);
+            $tanggal    = $_POST['tanggal'];
+            $waktu      = $_POST['waktu'];
+            $lokasi     = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
+            $agenda     = mysqli_real_escape_string($koneksi, $_POST['agenda']);
+            $peserta    = mysqli_real_escape_string($koneksi, $_POST['peserta']);
+            $ppt        = mysqli_real_escape_string($koneksi, $_POST['ppt']);
 
-    header("Location: isi.php?project_id=$project_id");
-    exit;
+            runQuery($koneksi, "
+                INSERT INTO meetings (project_id, judul, tanggal, waktu, lokasi, agenda, peserta, ppt)
+                VALUES ($project_id, '$judul', '$tanggal', '$waktu', '$lokasi', '$agenda', '$peserta', '$ppt')
+            ");
+
+            header("Location: isi.php?project_id=$project_id");
+            exit;
+    }
 }
 
 $search = isset($_GET['query']) ? mysqli_real_escape_string($koneksi, $_GET['query']) : '';
@@ -90,27 +98,24 @@ if ($search !== '') {
 }
 $sql .= " ORDER BY id DESC";
 
-$data = mysqli_query($koneksi, $sql);
+$data = runQuery($koneksi, $sql);
+$query_users = runQuery($koneksi, "SELECT * FROM daftar_peserta ORDER BY fullname ASC");
+$q_meetings  = runQuery($koneksi, "SELECT lokasi, tanggal, waktu FROM meetings");
+$q_rooms     = runQuery($koneksi, "SELECT * FROM rooms_meeting ORDER BY room_name ASC");
 
-$query_users = mysqli_query($koneksi, "SELECT * FROM daftar_peserta ORDER BY fullname ASC");
-
-$q_meetings = mysqli_query($koneksi, "SELECT lokasi, tanggal, waktu FROM meetings");
 $meetings_data = [];
 while ($m = mysqli_fetch_assoc($q_meetings)) {
     $meetings_data[] = $m;
 }
 
-$q_rooms = mysqli_query($koneksi, "SELECT * FROM rooms_meeting ORDER BY room_name ASC");
 $rooms_data = [];
-
 $currentTime = time();
 
 while ($room = mysqli_fetch_assoc($q_rooms)) {
     $isBooked = false;
 
     foreach ($meetings_data as $meeting) {
-        if (
-            isset($meeting['lokasi'], $meeting['tanggal'], $meeting['waktu']) &&
+        if (isset($meeting['lokasi'], $meeting['tanggal'], $meeting['waktu']) &&
             $meeting['lokasi'] === $room['room_name']
         ) {
             $meetingDT = strtotime($meeting['tanggal'].' '.$meeting['waktu']);

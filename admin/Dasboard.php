@@ -1,21 +1,28 @@
 <?php
 session_start();
 
-if (!isset($_SESSION['username']) || !isset($_SESSION['role'])) {
+try {
+    if (!isset($_SESSION['username']) || !isset($_SESSION['role'])) {
+        throw new Exception("User belum login");
+    }
+
+    if ($_SESSION['role'] !== 'admin') {
+        throw new Exception("Akses ditolak untuk role: " . $_SESSION['role']);
+    }
+
+    header("Cache-Control: no-cache, must-revalidate, max-age=0");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+
+    $current_page = basename($_SERVER['PHP_SELF']);
+    $username = $_SESSION['username'];
+
+} catch (Exception $e) {
+    error_log("Session Error: " . $e->getMessage());
     header("Location: Login.php");
     exit();
 }
 
-if ($_SESSION['role'] !== 'admin') {
-    header("Location: ../forbidden.php");
-    exit();
-}
-
-header("Cache-Control: no-cache, must-revalidate, max-age=0");
-header("Pragma: no-cache");
-header("Expires: 0");
-
-$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
 <!DOCTYPE html>

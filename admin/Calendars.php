@@ -1,56 +1,72 @@
 <?php
 include "../koneksi.php"; 
 
-if (isset($_POST['action']) && $_POST['action'] === 'delete') {
-    $id = (int)$_POST['id'];
+try {
+    if (isset($_POST['action']) && $_POST['action'] === 'delete') {
+        $id = (int)$_POST['id'];
 
-    $stmt = mysqli_prepare($koneksi, "DELETE FROM meetings WHERE id = ?");
-    mysqli_stmt_bind_param($stmt, "i", $id);
-    mysqli_stmt_execute($stmt);
-    mysqli_stmt_close($stmt);
+        $stmt = mysqli_prepare($koneksi, "DELETE FROM meetings WHERE id = ?");
+        if (!$stmt) throw new Exception("Prepare statement gagal: " . mysqli_error($koneksi));
+
+        mysqli_stmt_bind_param($stmt, "i", $id);
+        if (!mysqli_stmt_execute($stmt)) throw new Exception("Eksekusi query gagal: " . mysqli_stmt_error($stmt));
+
+        mysqli_stmt_close($stmt);
+
+        $bulan = isset($_GET['bulan']) ? (int)$_GET['bulan'] : date("n");
+        $tahun = isset($_GET['tahun']) ? (int)$_GET['tahun'] : date("Y");
+        header("Location: Calendars.php?bulan=$bulan&tahun=$tahun");
+        exit;
+    }
 
     $bulan = isset($_GET['bulan']) ? (int)$_GET['bulan'] : date("n");
     $tahun = isset($_GET['tahun']) ? (int)$_GET['tahun'] : date("Y");
-    header("Location: Calendars.php?bulan=$bulan&tahun=$tahun");
+
+    $namaBulan = [
+        1=>"Januari",2=>"Februari",3=>"Maret",4=>"April",
+        5=>"Mei",6=>"Juni",7=>"Juli",8=>"Agustus",
+        9=>"September",10=>"Oktober",11=>"November",12=>"Desember"
+    ];
+
+    $agenda = [];
+
+    $stmt = mysqli_prepare(
+        $koneksi,
+        "SELECT * FROM meetings WHERE MONTH(tanggal) = ? AND YEAR(tanggal) = ?"
+    );
+    if (!$stmt) throw new Exception("Prepare statement gagal: " . mysqli_error($koneksi));
+
+    mysqli_stmt_bind_param($stmt, "ii", $bulan, $tahun);
+    if (!mysqli_stmt_execute($stmt)) throw new Exception("Eksekusi query gagal: " . mysqli_stmt_error($stmt));
+
+    $result = mysqli_stmt_get_result($stmt);
+    if (!$result) throw new Exception("Gagal mengambil data: " . mysqli_error($koneksi));
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        $tgl = (int)date("j", strtotime($row['tanggal']));
+        $agenda[$tgl][] = $row;
+    }
+    mysqli_stmt_close($stmt);
+
+    $hariPertama = mktime(0, 0, 0, $bulan, 1, $tahun);
+    $jumlahHari  = (int)date("t", $hariPertama);
+    $hariAwal    = (int)date("w", $hariPertama);
+
+    $prevBulan = $bulan - 1; $prevTahun = $tahun;
+    if ($prevBulan < 1) { $prevBulan = 12; $prevTahun--; }
+
+    $nextBulan = $bulan + 1; $nextTahun = $tahun;
+    if ($nextBulan > 12) { $nextBulan = 1; $nextTahun++; }
+
+    $current_page = basename($_SERVER['PHP_SELF']);
+
+} catch (Exception $e) {
+    echo "<div style='color:red; padding:10px; border:1px solid #f00; margin:20px; font-weight:bold;'>";
+    echo "Terjadi error: " . htmlspecialchars($e->getMessage());
+    echo "</div>";
+    error_log($e->getMessage());
     exit;
 }
-
-$bulan = isset($_GET['bulan']) ? (int)$_GET['bulan'] : date("n");
-$tahun = isset($_GET['tahun']) ? (int)$_GET['tahun'] : date("Y");
-
-$namaBulan = [
-    1=>"Januari",2=>"Februari",3=>"Maret",4=>"April",
-    5=>"Mei",6=>"Juni",7=>"Juli",8=>"Agustus",
-    9=>"September",10=>"Oktober",11=>"November",12=>"Desember"
-];
-
-$agenda = [];
-
-$stmt = mysqli_prepare(
-    $koneksi,
-    "SELECT * FROM meetings WHERE MONTH(tanggal) = ? AND YEAR(tanggal) = ?"
-);
-mysqli_stmt_bind_param($stmt, "ii", $bulan, $tahun);
-mysqli_stmt_execute($stmt);
-$result = mysqli_stmt_get_result($stmt);
-
-while ($row = mysqli_fetch_assoc($result)) {
-    $tgl = (int)date("j", strtotime($row['tanggal']));
-    $agenda[$tgl][] = $row;
-}
-mysqli_stmt_close($stmt);
-
-$hariPertama = mktime(0, 0, 0, $bulan, 1, $tahun);
-$jumlahHari  = (int)date("t", $hariPertama);
-$hariAwal    = (int)date("w", $hariPertama);
-
-$prevBulan = $bulan - 1; $prevTahun = $tahun;
-if ($prevBulan < 1) { $prevBulan = 12; $prevTahun--; }
-
-$nextBulan = $bulan + 1; $nextTahun = $tahun;
-if ($nextBulan > 12) { $nextBulan = 1; $nextTahun++; }
-
-$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
 <!DOCTYPE html>
