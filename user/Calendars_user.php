@@ -1,5 +1,76 @@
 <?php
-include "../koneksi.php"; 
+session_start();
+include "../koneksi.php";
+
+function isUserLoggedIn() {
+    return isset($_SESSION['username']) && isset($_SESSION['role']);
+}
+
+function authorizeUserOnly() {
+    if ($_SESSION['role'] !== 'user') {
+        header("Location: ../forbidden.php");
+        exit();
+    }
+}
+
+try {
+    if (!isUserLoggedIn()) {
+        throw new Exception("Session tidak valid");
+    }
+    authorizeUserOnly();
+
+    if (!$GLOBALS['koneksi']) {
+        throw new Exception("Koneksi database gagal");
+    }
+} catch (Exception $e) {
+    error_log($e->getMessage());
+    echo "Terjadi kesalahan sistem.";
+    exit();
+}
+
+function formatTanggalIndo($tanggal) {
+    $hari = [
+        'Sunday'=>'Minggu','Monday'=>'Senin','Tuesday'=>'Selasa',
+        'Wednesday'=>'Rabu','Thursday'=>'Kamis','Friday'=>'Jumat','Saturday'=>'Sabtu'
+    ];
+    $bulan = [
+        'January'=>'Januari','February'=>'Februari','March'=>'Maret','April'=>'April',
+        'May'=>'Mei','June'=>'Juni','July'=>'Juli','August'=>'Agustus',
+        'September'=>'September','October'=>'Oktober','November'=>'November','December'=>'Desember'
+    ];
+    $t = strtotime($tanggal);
+    return $hari[date('l',$t)].', '.date('d',$t).' '.$bulan[date('F',$t)].' '.date('Y',$t);
+}
+
+function getAgendaByMonth($koneksi, $bulan, $tahun) {
+    $agenda = [];
+
+    try {
+        $stmt = mysqli_prepare(
+            $koneksi,
+            "SELECT * FROM meetings WHERE MONTH(tanggal) = ? AND YEAR(tanggal) = ? ORDER BY tanggal ASC, waktu ASC"
+        );
+        if (!$stmt) throw new Exception("Gagal menyiapkan query: " . $koneksi->error);
+
+        mysqli_stmt_bind_param($stmt, "ii", $bulan, $tahun);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+
+        if (!$result) throw new Exception("Query gagal: " . mysqli_stmt_error($stmt));
+
+        while ($row = mysqli_fetch_assoc($result)) {
+            $tgl = (int)date("j", strtotime($row['tanggal']));
+            $agenda[$tgl][] = $row;
+        }
+
+        mysqli_stmt_close($stmt);
+        return $agenda;
+
+    } catch (Exception $e) {
+        error_log($e->getMessage());
+        return [];
+    }
+}
 
 $bulan = isset($_GET['bulan']) ? (int)$_GET['bulan'] : (int)date("n");
 $tahun = isset($_GET['tahun']) ? (int)$_GET['tahun'] : (int)date("Y");
@@ -10,46 +81,21 @@ $namaBulan = [
     9=>"September",10=>"Oktober",11=>"November",12=>"Desember"
 ];
 
-$agenda = [];
-
-$stmt = mysqli_prepare(
-    $koneksi,
-    "SELECT * FROM meetings WHERE MONTH(tanggal) = ? AND YEAR(tanggal) = ?"
-);
-mysqli_stmt_bind_param($stmt, "ii", $bulan, $tahun);
-mysqli_stmt_execute($stmt);
-$result = mysqli_stmt_get_result($stmt);
-
-if ($result) {
-    while ($row = mysqli_fetch_assoc($result)) {
-        if (isset($row['tanggal'])) {
-            $tgl = (int)date("j", strtotime($row['tanggal']));
-            $agenda[$tgl][] = $row;
-        }
-    }
-}
-mysqli_stmt_close($stmt);
+$agenda = getAgendaByMonth($koneksi, $bulan, $tahun);
 
 $hariPertama = mktime(0, 0, 0, $bulan, 1, $tahun);
 $jumlahHari  = (int)date("t", $hariPertama);
 $hariAwal    = (int)date("w", $hariPertama);
 
-$prevBulan = $bulan - 1;
-$prevTahun = $tahun;
-if ($prevBulan < 1) {
-    $prevBulan = 12;
-    $prevTahun--;
-}
+$prevBulan = $bulan - 1; $prevTahun = $tahun;
+if ($prevBulan < 1) { $prevBulan = 12; $prevTahun--; }
 
-$nextBulan = $bulan + 1;
-$nextTahun = $tahun;
-if ($nextBulan > 12) {
-    $nextBulan = 1;
-    $nextTahun++;
-}
+$nextBulan = $bulan + 1; $nextTahun = $tahun;
+if ($nextBulan > 12) { $nextBulan = 1; $nextTahun++; }
 
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
+
 
 <!DOCTYPE html>
 <html lang="id">
