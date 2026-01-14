@@ -6,8 +6,9 @@ session_start();
 
 require_once "Koneksi.php";
 
-$mailUser = 'yantiindah110@gmail.com';      
-$mailPass = 'blke alyo gxaw pdas';       
+$config = require_once __DIR__ . '/config.php';
+$mailUser = $config['MAIL_USER'];
+$mailPass = $config['MAIL_PASS'];       
 
 if ($mailUser == '' || $mailPass == '') {
     exit("Konfigurasi email belum lengkap");
@@ -32,7 +33,7 @@ if (!isset($_SESSION['otp_time']) || (time() - $_SESSION['otp_time']) > 600) {
 $_SESSION['otp_request']++;
 
 if ($_SESSION['otp_request'] > 5) {
-    exit("Terlalu banyak permintaan OTP");
+    exit("Terlalu banyak permintaan OTP. Coba lagi dalam beberapa menit.");
 }
 
 $username = isset($_POST['username']) ? trim($_POST['username']) : '';
@@ -60,32 +61,20 @@ if ($db_email !== $email) {
     exit("Akun tidak valid");
 }
 
-date_default_timezone_set('Asia/Jakarta'); 
-
 sleep(1);
-$otp = sprintf("%06d", mt_rand(100000, 999999)); 
+$otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+$current_time = time();
+$expire_duration = 300; 
+$otp_expire = $current_time + $expire_duration;
 
 $_SESSION['otp_code']   = $otp;  
-$_SESSION['otp_expire'] = time() + 300; 
+$_SESSION['otp_expire'] = $otp_expire;
+$_SESSION['otp_generated_at'] = $current_time;
 $_SESSION['reset_user'] = $username;
 $_SESSION['otp_attempt'] = 0; 
 
-$logFile = __DIR__ . '/otp_debug.log';
-$timestamp = date('Y-m-d H:i:s');
-$log = "\n=== OTP GENERATED [$timestamp] ===\n";
-$log .= "Session ID: " . session_id() . "\n";
-$log .= "OTP Code: " . $_SESSION['otp_code'] . "\n";
-$log .= "Current Time: " . time() . " (" . date('Y-m-d H:i:s') . ")\n";
-$log .= "OTP Expire: " . $_SESSION['otp_expire'] . " (" . date('Y-m-d H:i:s', $_SESSION['otp_expire']) . ")\n";
-$log .= "Reset User: " . $_SESSION['reset_user'] . "\n";
-$log .= "Valid Duration: 300 seconds (5 minutes)\n";
-
-error_log($log);
-file_put_contents($logFile, $log, FILE_APPEND);
-
 if (!isset($_SESSION['csrf_otp'])) {
-    $_SESSION['csrf_otp'] = hash('sha256', uniqid(mt_rand(), true) . microtime(true) . session_id());
-}
+$_SESSION['csrf_otp'] = hash('sha256', uniqid() . microtime() . rand());}
 
 $mail = new PHPMailer(true);
 
@@ -104,15 +93,20 @@ try {
 
     $mail->isHTML(true);
     $mail->Subject = 'Kode OTP Reset Password';
+    
+    $expire_date_formatted = date('d/m/Y H:i:s', $otp_expire);
+    $safe_username = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
+    
     $mail->Body = "
         <div style='font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;'>
             <h2 style='color: #333;'>Reset Password</h2>
-            <p>Anda menerima email ini karena ada permintaan reset password untuk akun: <strong>$username</strong></p>
+            <p>Anda menerima email ini karena ada permintaan reset password untuk akun: <strong>{$safe_username}</strong></p>
             <div style='background: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;'>
                 <p style='margin: 0; color: #666;'>Kode OTP Anda:</p>
-                <h1 style='letter-spacing: 8px; color: #007bff; margin: 10px 0; font-size: 36px;'>$otp</h1>
+                <h1 style='letter-spacing: 8px; color: #007bff; margin: 10px 0; font-size: 36px;'>{$otp}</h1>
             </div>
             <p style='color: #d9534f;'><strong>⚠️ Kode ini berlaku selama 5 menit</strong></p>
+            <p style='color: #666; font-size: 14px;'>Kode akan expired pada: <strong>{$expire_date_formatted} WIB</strong></p>
             <p style='color: #666; font-size: 14px;'>Jangan bagikan kode ini kepada siapa pun. Jika Anda tidak meminta reset password, abaikan email ini.</p>
             <hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>
             <p style='color: #999; font-size: 12px;'>Email ini dikirim otomatis, mohon tidak membalas.</p>
@@ -120,12 +114,10 @@ try {
     ";
 
     $mail->send();
-    
-    error_log("OTP untuk $username ($email): $otp - Expire: " . date('Y-m-d H:i:s', $_SESSION['otp_expire']));
-    
     echo "OTP_SENT";
 
 } catch (Exception $e) {
-    error_log("PHPMailer Error: " . $mail->ErrorInfo);
+    error_log("Failed to send OTP: " . $mail->ErrorInfo);
     echo "Gagal mengirim email. Silakan coba lagi.";
 }
+?>
