@@ -1,0 +1,20 @@
+touch .gitignore
+```
+
+### 2. **Tambahkan `config.php` ke dalam `.gitignore`**
+
+Buka `.gitignore` dengan text editor, lalu tambahkan:
+```
+# File konfigurasi sensitif
+config.php
+
+# File environment lainnya (jika ada)
+.env
+*.local.php
+
+# Folder vendor (jika pakai Composer)
+vendor/
+
+# File sistem
+.DS_Store
+Thumbs.db
