@@ -38,6 +38,9 @@ function getDaftarPeserta($koneksi, $jurusan) {
     return $rows;
 }
 
+$success_message = '';
+$error_message = '';
+
 try {
     if (isset($_POST['submit_popup'])) {
         $jurusan  = mysqli_real_escape_string($koneksi, $_POST['jurusan']);
@@ -47,23 +50,50 @@ try {
         $username = mysqli_real_escape_string($koneksi, $_POST['username']);
         $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
 
-        $cek = queryDatabase($koneksi, "SELECT id FROM users WHERE username='$username'");
+        // Cek username duplikat
+        $cek = queryDatabase($koneksi, "SELECT username FROM users WHERE username='$username'");
         if (mysqli_num_rows($cek) > 0) {
             throw new Exception("Username sudah digunakan!");
         }
 
+        // Cek NIK duplikat di tabel users
+        $cek_nik_users = queryDatabase($koneksi, "SELECT nik FROM users WHERE nik='$nik'");
+        if (mysqli_num_rows($cek_nik_users) > 0) {
+            throw new Exception("NIK sudah terdaftar di users!");
+        }
+
+        // Cek NIK duplikat di tabel daftar_peserta
+        $cek_nik_peserta = queryDatabase($koneksi, "SELECT nik FROM daftar_peserta WHERE nik='$nik'");
+        if (mysqli_num_rows($cek_nik_peserta) > 0) {
+            throw new Exception("NIK sudah terdaftar di daftar peserta!");
+        }
+
+        // Cek email duplikat
+        $cek_email = queryDatabase($koneksi, "SELECT email FROM users WHERE email='$email'");
+        if (mysqli_num_rows($cek_email) > 0) {
+            throw new Exception("Email sudah terdaftar!");
+        }
+
+        // Insert ke users
         insertUser($koneksi, $jurusan, $email, $nik, $fullname, $username, $password);
+        
+        // Insert ke daftar_peserta
         insertDaftarPeserta($koneksi, $fullname, $nik, $jurusan);
 
-        echo "<script>
-                alert('Akun berhasil dibuat!');
-                window.location.href='detail.php';
-              </script>";
+        $success_message = "Akun berhasil dibuat untuk $fullname!";
+        
+        // Redirect dengan parameter success
+        header("Location: detail.php?success=1");
         exit();
     }
 } catch(Exception $e) {
     $error_message = $e->getMessage();
     error_log($error_message);
+}
+
+// Cek jika ada parameter success dari redirect
+if (isset($_GET['success']) && $_GET['success'] == 1) {
+    $success_message = "Akun berhasil dibuat!";
 }
 
 $dataPeserta = [];
@@ -189,6 +219,22 @@ foreach($fixedJurusan as $jurusan) {
         <div class="container mt-5">
             <h2 class="mb-4">Info Lebih Detail</h2>
 
+            <!-- Alert Success -->
+            <?php if ($success_message): ?>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <strong>Berhasil!</strong> <?= htmlspecialchars($success_message) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <?php endif; ?>
+
+            <!-- Alert Error -->
+            <?php if ($error_message): ?>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>Error!</strong> <?= htmlspecialchars($error_message) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <?php endif; ?>
+
             <div class="col-md-6" style="margin-left:50px;">
 
                 <?php foreach ($fixedJurusan as $jurusan): 
@@ -205,7 +251,7 @@ foreach($fixedJurusan as $jurusan) {
                     <div id="peserta-<?= $id ?>" class="ps-3" style="display:none;">
 
                         <button class="btn btn-primary mb-3"
-                                onclick="openTambahUser('<?= $jurusan ?>')">
+                                onclick="event.stopPropagation(); openTambahUser('<?= htmlspecialchars($jurusan, ENT_QUOTES) ?>')">
                             + Tambah User Jurusan Ini
                         </button>
 
@@ -250,7 +296,7 @@ foreach($fixedJurusan as $jurusan) {
 
           <div class="modal-body">
 
-            <form method="POST">
+            <form method="POST" id="formTambahUser">
 
                 <input type="hidden" name="jurusan" id="popup_jurusan">
 
@@ -261,7 +307,7 @@ foreach($fixedJurusan as $jurusan) {
 
                 <div class="mb-3">
                     <label>Email</label>
-                    <input type="text" name="email" class="form-control" required>
+                    <input type="email" name="email" class="form-control" required>
                 </div>
 
                 <div class="mb-3">
@@ -281,7 +327,7 @@ foreach($fixedJurusan as $jurusan) {
 
                 <div class="mb-3">
                     <label>Password</label>
-                    <input type="password" name="password" class="form-control" required>
+                    <input type="password" name="password" class="form-control" required minlength="6">
                 </div>
 
                 <button type="submit" name="submit_popup" class="btn btn-primary w-100">
@@ -306,9 +352,26 @@ foreach($fixedJurusan as $jurusan) {
             document.getElementById("popup_jurusan").value = jurusan;
             document.getElementById("popup_jurusan_text").value = jurusan;
 
+            // Reset form
+            document.getElementById("formTambahUser").reset();
+            document.getElementById("popup_jurusan").value = jurusan;
+            document.getElementById("popup_jurusan_text").value = jurusan;
+
             let modal = new bootstrap.Modal(document.getElementById("modalTambahUser"));
             modal.show();
         }
+
+        // Auto hide alert after 5 seconds
+        setTimeout(function() {
+            $('.alert').fadeOut('slow');
+        }, 5000);
+
+        // Clear URL parameters after showing alert
+        <?php if (isset($_GET['success'])): ?>
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.pathname);
+        }
+        <?php endif; ?>
     </script>
 
 </body>
