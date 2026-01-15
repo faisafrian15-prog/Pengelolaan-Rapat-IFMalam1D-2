@@ -6,8 +6,8 @@ if (empty($_SESSION['csrf'])) {
     $_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(32));
 }
 
-$method = $_SERVER['REQUEST_METHOD'];
-$action = isset($_POST['action']) ? $_POST['action'] : '';
+ $method = $_SERVER['REQUEST_METHOD'];
+ $action = isset($_POST['action']) ? $_POST['action'] : '';
 
 function check_csrf() {
     if (!isset($_POST['csrf']) || $_POST['csrf'] !== $_SESSION['csrf']) {
@@ -27,6 +27,54 @@ function runQuery($koneksi, $sql, $redirect = null) {
         echo "<div class='alert alert-danger'>Terjadi kesalahan pada database. Silakan hubungi admin.</div>";
         exit;
     }
+}
+
+// --- Fungsi Helper untuk Upload PPT (DIPERBAIKI) ---
+function handlePptUploadCreate($fileInput, $urlInput) {
+    global $koneksi;
+    
+    // Cek apakah user memilih Tab URL
+    $useUrl = isset($_POST['use_ppt_url']) && $_POST['use_ppt_url'] === '1';
+
+    // 1. LOGIKA: Jika User memilih Tab URL
+    if ($useUrl && !empty($urlInput)) {
+        return trim($urlInput);
+    }
+
+    // 2. LOGIKA: Jika User Upload File
+    if (!empty($fileInput['name']) && $fileInput['error'] === 0) {
+        // PERBAIKAN: Hapus strtolower() agar ekstensi huruf besar (PPT, PDF) tetap diterima
+        // Tambahkan ekstensi huruf besar ke daftar yang diizinkan
+        $allowedExts = ['pdf', 'ppt', 'pptx', 'doc', 'docx', 'PDF', 'PPT', 'PPTX', 'DOC', 'DOCX'];
+        
+        $fileExt = pathinfo($fileInput['name'], PATHINFO_EXTENSION);
+        
+        if (in_array($fileExt, $allowedExts) && $fileInput['size'] <= 10485760) { // Max 10MB
+            $newFileName = uniqid('ppt_') . '.' . $fileExt;
+            
+            // Cek apakah folder assets ada
+            if (!is_dir('../assets')) {
+                // Jika folder tidak ada, coba buat (optional, untuk debugging)
+                // mkdir('../assets', 0777, true);
+            }
+
+            if (move_uploaded_file($fileInput['tmp_name'], "../assets/" . $newFileName)) {
+                return $newFileName; // SUKSES: Kembalikan nama file
+            } else {
+                // DEBUGGING: Jika gagal move file
+                echo "<div class='alert alert-danger'>Gagal memindahkan file ke folder assets. Pastikan folder ada dan writable.</div>";
+            }
+        } else {
+            // DEBUGGING: Jika ekstensi salah atau ukuran terlalu besar
+            $errorMsg = "Format file salah atau terlalu besar. ";
+            $errorMsg .= "Ekstensi: " . htmlspecialchars($fileExt) . ". ";
+            $errorMsg .= "Ukuran: " . ($fileInput['size'] / 1024 / 1024) . " MB";
+            echo "<div class='alert alert-danger'>$errorMsg</div>";
+        }
+    }
+
+    // 3. Return kosong jika tidak ada yang dipilih
+    return ''; 
 }
 
 if ($method === 'POST') {
@@ -76,11 +124,22 @@ if ($method === 'POST') {
             $lokasi     = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
             $agenda     = mysqli_real_escape_string($koneksi, $_POST['agenda']);
             $peserta    = mysqli_real_escape_string($koneksi, $_POST['peserta']);
-            $ppt        = mysqli_real_escape_string($koneksi, $_POST['ppt']);
+            
+            // Proses PPT Baru
+            $pptValue = handlePptUploadCreate(
+                isset($_FILES['ppt_file']) ? $_FILES['ppt_file'] : null,
+                isset($_POST['ppt_url']) ? $_POST['ppt_url'] : ''
+            );
+            
+            // Escape untuk keamanan SQL
+            $pptEscaped = mysqli_real_escape_string($koneksi, $pptValue);
+
+            // DEBUGGING (Opsional): Hapus komentar di bawah untuk melihat nilai ppt sebelum simpan
+            // die("PPT Value to Save: " . $pptEscaped);
 
             runQuery($koneksi, "
                 INSERT INTO meetings (project_id, judul, tanggal, waktu, lokasi, agenda, peserta, ppt)
-                VALUES ($project_id, '$judul', '$tanggal', '$waktu', '$lokasi', '$agenda', '$peserta', '$ppt')
+                VALUES ($project_id, '$judul', '$tanggal', '$waktu', '$lokasi', '$agenda', '$peserta', '$pptEscaped')
             ");
 
             header("Location: isi.php?project_id=$project_id");
@@ -88,28 +147,28 @@ if ($method === 'POST') {
     }
 }
 
-$search = isset($_GET['query']) ? mysqli_real_escape_string($koneksi, $_GET['query']) : '';
+ $search = isset($_GET['query']) ? mysqli_real_escape_string($koneksi, $_GET['query']) : '';
 
-$sql = "SELECT * FROM projects";
+ $sql = "SELECT * FROM projects";
 if ($search !== '') {
     $sql .= " WHERE name LIKE '%$search%' 
               OR description LIKE '%$search%' 
               OR status LIKE '%$search%'";
 }
-$sql .= " ORDER BY id DESC";
+ $sql .= " ORDER BY id DESC";
 
-$data = runQuery($koneksi, $sql);
-$query_users = runQuery($koneksi, "SELECT * FROM daftar_peserta ORDER BY fullname ASC");
-$q_meetings  = runQuery($koneksi, "SELECT lokasi, tanggal, waktu FROM meetings");
-$q_rooms     = runQuery($koneksi, "SELECT * FROM rooms_meeting ORDER BY room_name ASC");
+ $data = runQuery($koneksi, $sql);
+ $query_users = runQuery($koneksi, "SELECT * FROM daftar_peserta ORDER BY fullname ASC");
+ $q_meetings  = runQuery($koneksi, "SELECT lokasi, tanggal, waktu FROM meetings");
+ $q_rooms     = runQuery($koneksi, "SELECT * FROM rooms_meeting ORDER BY room_name ASC");
 
-$meetings_data = [];
+ $meetings_data = [];
 while ($m = mysqli_fetch_assoc($q_meetings)) {
     $meetings_data[] = $m;
 }
 
-$rooms_data = [];
-$currentTime = time();
+ $rooms_data = [];
+ $currentTime = time();
 
 while ($room = mysqli_fetch_assoc($q_rooms)) {
     $isBooked = false;
@@ -130,7 +189,7 @@ while ($room = mysqli_fetch_assoc($q_rooms)) {
     $rooms_data[] = $room;
 }
 
-$current_page = basename($_SERVER['PHP_SELF']);
+ $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
 <!DOCTYPE html>
@@ -209,6 +268,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
     select option:disabled {
         opacity: 0.6;
     }
+
+    /* Style khusus Preview PPT */
+    .ppt-preview-box {
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        position: relative;
+        overflow: hidden;
+    }
+    .ppt-preview-box img { width: 100%; height: 100%; object-fit: cover; }
+    .ppt-preview-box .file-icon { font-size: 2.5rem; color: #6c757d; }
     </style>
 </head>
 
@@ -468,8 +542,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </form>
                     </div>
 
+                    <!-- TAB ISI RAPAT (Diperbarui dengan Fitur PPT File/URL) -->
                     <div class="tab-pane fade p-4" id="isiTab">
-                        <form method="POST">
+                        <form method="POST" enctype="multipart/form-data">
                             <input type="hidden" name="csrf" value="<?= $_SESSION['csrf'] ?>">
                             <input type="hidden" name="action" value="create_meeting">
 
@@ -537,9 +612,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                             data-bs-auto-close="outside" 
                                             aria-expanded="false">
                                         <span id="selectedPesertaLabel">Pilih Peserta...</span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
-                                        </svg>
+                                        <i class="bi bi-chevron-down"></i>
                                     </button>
                                     
                                     <ul class="dropdown-menu participant-dropdown-menu" aria-labelledby="pesertaDropdownBtn">
@@ -553,7 +626,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                             if ($query_users && mysqli_num_rows($query_users) > 0): 
                                                 while($u = mysqli_fetch_assoc($query_users)): ?>
                                                     
-                                                    <div class="participant-item" onclick="event.stopPropagation()">
+                                                    <div class="participant-item">
                                                         <div class="form-check">
                                                             <input class="form-check-input peserta-checkbox" 
                                                                    type="checkbox" 
@@ -585,11 +658,38 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 <small class="text-muted">Centang nama peserta di atas (Bisa pilih banyak).</small>
                             </div>
 
+                            <!-- BAGIAN PPT BARU (TAB: FILE / URL) -->
                             <div class="mb-3">
-                                <label class="form-label">PPT / Slide (Link)</label>
-                                <input class="form-control" 
-                                       name="ppt" 
-                                       placeholder="https://...">
+                                <label class="form-label fw-bold">PPT / Slide</label>
+                                <ul class="nav nav-tabs mb-2" role="tablist">
+                                    <li class="nav-item">
+                                        <button class="nav-link active" id="upload-tab-create" data-bs-toggle="tab" data-bs-target="#upload-pane-create" type="button" role="tab">Upload File</button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link" id="url-tab-create" data-bs-toggle="tab" data-bs-target="#url-pane-create" type="button" role="tab">Link URL</button>
+                                    </li>
+                                </ul>
+                                
+                                <div class="tab-content">
+                                    <div class="tab-pane fade show active" id="upload-pane-create" role="tabpanel">
+                                        <input type="file" name="ppt_file" class="form-control" id="fileInputCreate" accept=".pdf,.ppt,.pptx,.doc,.docx">
+                                        <small class="text-muted">Maksimal 10MB. Format: PDF, PPT, PPTX.</small>
+                                    </div>
+                                    
+                                    <div class="tab-pane fade" id="url-pane-create" role="tabpanel">
+                                        <input type="hidden" name="use_ppt_url" id="useUrlCreate" value="0">
+                                        <input type="text" name="ppt_url" class="form-control" id="urlInputCreate" placeholder="https://drive.google.com/...">
+                                        <small class="text-muted">Masukkan URL lengkap presentasi.</small>
+                                    </div>
+                                </div>
+
+                                <!-- Preview Area -->
+                                <div class="mt-2">
+                                    <label class="small text-muted">Preview:</label>
+                                    <div class="ppt-preview-box" id="previewBoxCreate">
+                                        <span class="text-muted small">Belum ada file dipilih</span>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="text-end">
@@ -720,6 +820,57 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             dateInput.addEventListener('change', updateRoomAvailability);
             timeInput.addEventListener('change', updateRoomAvailability);
+        });
+    </script>
+
+    <script>
+        // Logic PPT untuk Create Modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('fileInputCreate');
+            const urlInput = document.getElementById('urlInputCreate');
+            const useUrlInput = document.getElementById('useUrlCreate');
+            const previewBox = document.getElementById('previewBoxCreate');
+            const tabUpload = document.getElementById('upload-tab-create');
+            const tabUrl = document.getElementById('url-tab-create');
+
+            function updatePreview() {
+                previewBox.innerHTML = '';
+                
+                if (useUrlInput.value === '1' && urlInput.value.trim() !== '') {
+                    // Preview URL
+                    const url = urlInput.value.trim();
+                    if (url.match(/\.(jpeg|jpg|gif|png)$/) != null) {
+                         previewBox.innerHTML = `<img src="${url}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><div class="text-center" style="display:none"><i class="bi bi-link-45deg file-icon"></i><div class="small text-break px-2 mt-1">${url}</div></div>`;
+                    } else {
+                         previewBox.innerHTML = `<div class="text-center"><i class="bi bi-link-45deg file-icon"></i><div class="small text-break px-2 mt-1">${url}</div></div>`;
+                    }
+                } else if (fileInput.files && fileInput.files[0]) {
+                    // Preview File
+                    const fileName = fileInput.files[0].name;
+                    previewBox.innerHTML = `<div class="text-center"><i class="bi bi-file-earmark-arrow-up-fill file-icon"></i><div class="small text-break px-2 mt-1">${fileName}</div></div>`;
+                } else {
+                    previewBox.innerHTML = `<span class="text-muted small">Belum ada file dipilih</span>`;
+                }
+            }
+
+            if(tabUpload) {
+                tabUpload.addEventListener('shown.bs.tab', function () {
+                    useUrlInput.value = '0';
+                    updatePreview();
+                });
+            }
+            if(tabUrl) {
+                tabUrl.addEventListener('shown.bs.tab', function () {
+                    useUrlInput.value = '1';
+                    updatePreview();
+                });
+            }
+            if(fileInput) {
+                fileInput.addEventListener('change', updatePreview);
+            }
+            if(urlInput) {
+                urlInput.addEventListener('input', updatePreview);
+            }
         });
     </script>
 </body>
