@@ -29,22 +29,16 @@ function runQuery($koneksi, $sql, $redirect = null) {
     }
 }
 
-// --- Fungsi Helper untuk Upload PPT (DIPERBAIKI) ---
 function handlePptUploadCreate($fileInput, $urlInput) {
     global $koneksi;
     
-    // Cek apakah user memilih Tab URL
     $useUrl = isset($_POST['use_ppt_url']) && $_POST['use_ppt_url'] === '1';
 
-    // 1. LOGIKA: Jika User memilih Tab URL
     if ($useUrl && !empty($urlInput)) {
         return trim($urlInput);
     }
 
-    // 2. LOGIKA: Jika User Upload File
     if (!empty($fileInput['name']) && $fileInput['error'] === 0) {
-        // PERBAIKAN: Hapus strtolower() agar ekstensi huruf besar (PPT, PDF) tetap diterima
-        // Tambahkan ekstensi huruf besar ke daftar yang diizinkan
         $allowedExts = ['pdf', 'ppt', 'pptx', 'doc', 'docx', 'PDF', 'PPT', 'PPTX', 'DOC', 'DOCX'];
         
         $fileExt = pathinfo($fileInput['name'], PATHINFO_EXTENSION);
@@ -52,20 +46,15 @@ function handlePptUploadCreate($fileInput, $urlInput) {
         if (in_array($fileExt, $allowedExts) && $fileInput['size'] <= 10485760) { // Max 10MB
             $newFileName = uniqid('ppt_') . '.' . $fileExt;
             
-            // Cek apakah folder assets ada
             if (!is_dir('../assets')) {
-                // Jika folder tidak ada, coba buat (optional, untuk debugging)
-                // mkdir('../assets', 0777, true);
             }
 
             if (move_uploaded_file($fileInput['tmp_name'], "../assets/" . $newFileName)) {
-                return $newFileName; // SUKSES: Kembalikan nama file
+                return $newFileName; 
             } else {
-                // DEBUGGING: Jika gagal move file
                 echo "<div class='alert alert-danger'>Gagal memindahkan file ke folder assets. Pastikan folder ada dan writable.</div>";
             }
         } else {
-            // DEBUGGING: Jika ekstensi salah atau ukuran terlalu besar
             $errorMsg = "Format file salah atau terlalu besar. ";
             $errorMsg .= "Ekstensi: " . htmlspecialchars($fileExt) . ". ";
             $errorMsg .= "Ukuran: " . ($fileInput['size'] / 1024 / 1024) . " MB";
@@ -73,7 +62,6 @@ function handlePptUploadCreate($fileInput, $urlInput) {
         }
     }
 
-    // 3. Return kosong jika tidak ada yang dipilih
     return ''; 
 }
 
@@ -125,17 +113,12 @@ if ($method === 'POST') {
             $agenda     = mysqli_real_escape_string($koneksi, $_POST['agenda']);
             $peserta    = mysqli_real_escape_string($koneksi, $_POST['peserta']);
             
-            // Proses PPT Baru
             $pptValue = handlePptUploadCreate(
                 isset($_FILES['ppt_file']) ? $_FILES['ppt_file'] : null,
                 isset($_POST['ppt_url']) ? $_POST['ppt_url'] : ''
             );
             
-            // Escape untuk keamanan SQL
             $pptEscaped = mysqli_real_escape_string($koneksi, $pptValue);
-
-            // DEBUGGING (Opsional): Hapus komentar di bawah untuk melihat nilai ppt sebelum simpan
-            // die("PPT Value to Save: " . $pptEscaped);
 
             runQuery($koneksi, "
                 INSERT INTO meetings (project_id, judul, tanggal, waktu, lokasi, agenda, peserta, ppt)
@@ -269,7 +252,6 @@ while ($room = mysqli_fetch_assoc($q_rooms)) {
         opacity: 0.6;
     }
 
-    /* Style khusus Preview PPT */
     .ppt-preview-box {
         height: 120px;
         display: flex;
@@ -542,7 +524,6 @@ while ($room = mysqli_fetch_assoc($q_rooms)) {
                         </form>
                     </div>
 
-                    <!-- TAB ISI RAPAT (Diperbarui dengan Fitur PPT File/URL) -->
                     <div class="tab-pane fade p-4" id="isiTab">
                         <form method="POST" enctype="multipart/form-data">
                             <input type="hidden" name="csrf" value="<?= $_SESSION['csrf'] ?>">
@@ -658,7 +639,6 @@ while ($room = mysqli_fetch_assoc($q_rooms)) {
                                 <small class="text-muted">Centang nama peserta di atas (Bisa pilih banyak).</small>
                             </div>
 
-                            <!-- BAGIAN PPT BARU (TAB: FILE / URL) -->
                             <div class="mb-3">
                                 <label class="form-label fw-bold">PPT / Slide</label>
                                 <ul class="nav nav-tabs mb-2" role="tablist">
@@ -683,7 +663,6 @@ while ($room = mysqli_fetch_assoc($q_rooms)) {
                                     </div>
                                 </div>
 
-                                <!-- Preview Area -->
                                 <div class="mt-2">
                                     <label class="small text-muted">Preview:</label>
                                     <div class="ppt-preview-box" id="previewBoxCreate">
@@ -824,7 +803,6 @@ while ($room = mysqli_fetch_assoc($q_rooms)) {
     </script>
 
     <script>
-        // Logic PPT untuk Create Modal
         document.addEventListener('DOMContentLoaded', function() {
             const fileInput = document.getElementById('fileInputCreate');
             const urlInput = document.getElementById('urlInputCreate');
@@ -837,7 +815,6 @@ while ($room = mysqli_fetch_assoc($q_rooms)) {
                 previewBox.innerHTML = '';
                 
                 if (useUrlInput.value === '1' && urlInput.value.trim() !== '') {
-                    // Preview URL
                     const url = urlInput.value.trim();
                     if (url.match(/\.(jpeg|jpg|gif|png)$/) != null) {
                          previewBox.innerHTML = `<img src="${url}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><div class="text-center" style="display:none"><i class="bi bi-link-45deg file-icon"></i><div class="small text-break px-2 mt-1">${url}</div></div>`;
@@ -845,7 +822,6 @@ while ($room = mysqli_fetch_assoc($q_rooms)) {
                          previewBox.innerHTML = `<div class="text-center"><i class="bi bi-link-45deg file-icon"></i><div class="small text-break px-2 mt-1">${url}</div></div>`;
                     }
                 } else if (fileInput.files && fileInput.files[0]) {
-                    // Preview File
                     const fileName = fileInput.files[0].name;
                     previewBox.innerHTML = `<div class="text-center"><i class="bi bi-file-earmark-arrow-up-fill file-icon"></i><div class="small text-break px-2 mt-1">${fileName}</div></div>`;
                 } else {

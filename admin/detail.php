@@ -50,39 +50,32 @@ try {
         $username = mysqli_real_escape_string($koneksi, $_POST['username']);
         $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
 
-        // Cek username duplikat
         $cek = queryDatabase($koneksi, "SELECT username FROM users WHERE username='$username'");
         if (mysqli_num_rows($cek) > 0) {
             throw new Exception("Username sudah digunakan!");
         }
 
-        // Cek NIK duplikat di tabel users
         $cek_nik_users = queryDatabase($koneksi, "SELECT nik FROM users WHERE nik='$nik'");
         if (mysqli_num_rows($cek_nik_users) > 0) {
             throw new Exception("NIK sudah terdaftar di users!");
         }
 
-        // Cek NIK duplikat di tabel daftar_peserta
         $cek_nik_peserta = queryDatabase($koneksi, "SELECT nik FROM daftar_peserta WHERE nik='$nik'");
         if (mysqli_num_rows($cek_nik_peserta) > 0) {
             throw new Exception("NIK sudah terdaftar di daftar peserta!");
         }
 
-        // Cek email duplikat
         $cek_email = queryDatabase($koneksi, "SELECT email FROM users WHERE email='$email'");
         if (mysqli_num_rows($cek_email) > 0) {
             throw new Exception("Email sudah terdaftar!");
         }
 
-        // Insert ke users
         insertUser($koneksi, $jurusan, $email, $nik, $fullname, $username, $password);
         
-        // Insert ke daftar_peserta
         insertDaftarPeserta($koneksi, $fullname, $nik, $jurusan);
 
         $success_message = "Akun berhasil dibuat untuk $fullname!";
         
-        // Redirect dengan parameter success
         header("Location: detail.php?success=1");
         exit();
     }
@@ -91,7 +84,6 @@ try {
     error_log($error_message);
 }
 
-// Cek jika ada parameter success dari redirect
 if (isset($_GET['success']) && $_GET['success'] == 1) {
     $success_message = "Akun berhasil dibuat!";
 }
@@ -219,7 +211,6 @@ foreach($fixedJurusan as $jurusan) {
         <div class="container mt-5">
             <h2 class="mb-4">Info Lebih Detail</h2>
 
-            <!-- Alert Success -->
             <?php if ($success_message): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 <strong>Berhasil!</strong> <?= htmlspecialchars($success_message) ?>
@@ -227,7 +218,6 @@ foreach($fixedJurusan as $jurusan) {
             </div>
             <?php endif; ?>
 
-            <!-- Alert Error -->
             <?php if ($error_message): ?>
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <strong>Error!</strong> <?= htmlspecialchars($error_message) ?>
@@ -374,7 +364,6 @@ foreach($fixedJurusan as $jurusan) {
             document.getElementById("popup_jurusan").value = jurusan;
             document.getElementById("popup_jurusan_text").value = jurusan;
 
-            // Reset form
             document.getElementById("formTambahUser").reset();
             document.getElementById("popup_jurusan").value = jurusan;
             document.getElementById("popup_jurusan_text").value = jurusan;
@@ -383,7 +372,6 @@ foreach($fixedJurusan as $jurusan) {
             modal.show();
         }
 
-        // Toggle password visibility
         document.getElementById("togglePassword").addEventListener("click", function() {
             const passwordInput = document.getElementById("userPassword");
             const eyeIcon = document.getElementById("eyeIcon");
@@ -424,26 +412,22 @@ foreach($fixedJurusan as $jurusan) {
             }
         });
 
-        // Validasi password sebelum submit
         document.getElementById("formTambahUser").addEventListener("submit", function(e) {
             const password = document.getElementById("userPassword").value;
             const confirmPassword = document.getElementById("confirmUserPassword").value;
 
-            // Cek apakah password cocok
             if (password !== confirmPassword) {
                 e.preventDefault();
                 alert("Password tidak cocok!");
                 return false;
             }
 
-            // Cek panjang password
             if (password.length < 6) {
                 e.preventDefault();
                 alert("Password minimal 6 karakter!");
                 return false;
             }
 
-            // Cek kompleksitas password
             const hasUpperCase = /[A-Z]/.test(password);
             const hasNumber = /\d/.test(password);
             const hasSymbol = /[\W_]/.test(password);
@@ -457,12 +441,10 @@ foreach($fixedJurusan as $jurusan) {
             return true;
         });
 
-        // Auto hide alert after 5 seconds
         setTimeout(function() {
             $('.alert').fadeOut('slow');
         }, 5000);
 
-        // Clear URL parameters after showing alert
         <?php if (isset($_GET['success'])): ?>
         if (window.history.replaceState) {
             window.history.replaceState(null, null, window.location.pathname);

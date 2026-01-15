@@ -12,16 +12,12 @@ function check_csrf() {
     }
 }
 
-// --- Fungsi Helper untuk Upload PPT ---
 function handlePptUpload($fileInput, $urlInput, $oldFile = '') {
-    global $koneksi; // Akses koneksi database jika perlu query tambahan (opsional)
+    global $koneksi; 
     
-    // 1. Cek jika user memilih input URL (Lebih prioritas jika tab URL aktif)
-    // Kita deteksi dari input hidden 'use_ppt_url' yang kita set di JS/Form
     $useUrl = isset($_POST['use_ppt_url']) && $_POST['use_ppt_url'] === '1';
 
     if ($useUrl && !empty($urlInput)) {
-        // Hapus file lama jika sebelumnya adalah file upload (bukan link)
         if ($oldFile && !preg_match('/^https?:\/\//', $oldFile)) {
             $filePath = "../assets/" . $oldFile;
             if (file_exists($filePath)) {
@@ -31,17 +27,14 @@ function handlePptUpload($fileInput, $urlInput, $oldFile = '') {
         return trim($urlInput);
     }
 
-    // 2. Cek jika user mengupload file baru
     if (!empty($fileInput['name']) && $fileInput['error'] === 0) {
         $allowedExts = ['pdf', 'ppt', 'pptx', 'doc', 'docx'];
         $fileExt = strtolower(pathinfo($fileInput['name'], PATHINFO_EXTENSION));
         
-        // Validasi ekstensi
         if (in_array($fileExt, $allowedExts) && $fileInput['size'] <= 10485760) { // Max 10MB
             $newFileName = uniqid('ppt_') . '.' . $fileExt;
             
             if (move_uploaded_file($fileInput['tmp_name'], "../assets/" . $newFileName)) {
-                // Hapus file lama jika ada
                 if ($oldFile && !preg_match('/^https?:\/\//', $oldFile)) {
                     $oldFilePath = "../assets/" . $oldFile;
                     if (file_exists($oldFilePath)) {
@@ -53,7 +46,6 @@ function handlePptUpload($fileInput, $urlInput, $oldFile = '') {
         }
     }
 
-    // 3. Jika tidak ada perubahan (kosong), kembalikan nilai lama
     return $oldFile;
 }
 
@@ -66,12 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id         = (int)$_POST['id'];
         $project_id = (int)$_POST['project_id'];
         
-        // Ambil data PPT lama untuk referensi penghapusan
         $q_old = mysqli_query($koneksi, "SELECT ppt FROM meetings WHERE id=$id");
         $d_old = mysqli_fetch_assoc($q_old);
         $oldPpt = isset($d_old['ppt']) ? $d_old['ppt'] : '';
 
-        // Proses PPT (File atau URL)
         $pptValue = handlePptUpload(
             isset($_FILES['ppt_file']) ? $_FILES['ppt_file'] : null,
             isset($_POST['ppt_url']) ? $_POST['ppt_url'] : '',
@@ -84,7 +74,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lokasi     = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
         $agenda     = mysqli_real_escape_string($koneksi, $_POST['agenda']);
         $peserta    = mysqli_real_escape_string($koneksi, $_POST['peserta']);
-        // $pptValue sudah aman dihandle fungsi, tapi tetap escape untuk query
         $pptEscaped = mysqli_real_escape_string($koneksi, $pptValue);
 
         mysqli_query($koneksi, "
@@ -108,7 +97,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id         = (int)$_POST['id'];
         $project_id = (int)$_POST['project_id'];
 
-        // Hapus file ppt fisik jika ada
         $d = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT ppt FROM meetings WHERE id=$id"));
         if($d && $d['ppt'] && !preg_match('/^https?:\/\//', $d['ppt'])){
             @unlink("../assets/".$d['ppt']);
@@ -176,7 +164,6 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
     option:disabled { color: #dc3545 !important; background-color: #f8d7da !important; font-weight: bold !important; cursor: not-allowed !important; }
     select option:disabled { opacity: 0.6; }
     
-    /* Style khusus Preview PPT */
     .ppt-preview-box {
         height: 150px;
         display: flex;
@@ -230,7 +217,6 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $link = $scheme.'://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'];
         
-        // Logika Tampilan PPT (Icon File atau Link)
         $pptDisplay = '';
         $pptIsLink = false;
         if(!empty($row['ppt'])){
@@ -277,7 +263,6 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
         </div>
         </div>
 
-        <!-- MODAL EDIT (Diperbarui) -->
         <div class="modal fade" id="editModal<?= $row['id'] ?>" tabindex="-1">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
@@ -342,7 +327,6 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
                                 <small class="text-muted">Centang nama peserta di atas.</small>
                             </div>
                             
-                            <!-- BAGIAN PPT BARU (TAB: FILE / URL) -->
                             <div class="mb-3">
                                 <label class="form-label fw-bold">PPT / Slide</label>
                                 <ul class="nav nav-tabs mb-2" role="tablist">
@@ -355,13 +339,11 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
                                 </ul>
                                 
                                 <div class="tab-content">
-                                    <!-- Tab Upload File -->
                                     <div class="tab-pane fade <?= !$pptIsLink && !empty($row['ppt']) ? 'show active' : '' ?>" id="upload-pane-ppt<?= $counter ?>" role="tabpanel">
                                         <input type="file" name="ppt_file" class="form-control" id="fileInputPpt<?= $counter ?>" accept=".pdf,.ppt,.pptx,.doc,.docx">
                                         <small class="text-muted">Biarkan kosong jika tidak ingin mengubah file.</small>
                                     </div>
                                     
-                                    <!-- Tab URL -->
                                     <div class="tab-pane fade <?= $pptIsLink ? 'show active' : '' ?>" id="url-pane-ppt<?= $counter ?>" role="tabpanel">
                                         <input type="hidden" name="use_ppt_url" id="useUrlPpt<?= $counter ?>" value="<?= $pptIsLink ? '1' : '0' ?>">
                                         <input type="text" name="ppt_url" class="form-control" id="urlInputPpt<?= $counter ?>" placeholder="https://..." value="<?= $pptIsLink ? htmlspecialchars($row['ppt']) : '' ?>">
@@ -369,19 +351,16 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
                                     </div>
                                 </div>
 
-                                <!-- Preview Area -->
                                 <div class="mt-2">
                                     <label class="small text-muted">Preview Saat Ini:</label>
                                     <div class="ppt-preview-box" id="previewBoxPpt<?= $counter ?>">
                                         <?php if(!empty($row['ppt'])): ?>
                                             <?php if($pptIsLink): ?>
-                                                <!-- Jika Link -->
                                                 <div class="text-center">
                                                     <i class="bi bi-link-45deg file-icon"></i>
                                                     <div class="small text-break px-2 mt-1"><?= htmlspecialchars($row['ppt']) ?></div>
                                                 </div>
                                             <?php else: ?>
-                                                <!-- Jika File Upload -->
                                                 <div class="text-center">
                                                     <i class="bi bi-file-earmark-ppt-fill file-icon"></i>
                                                     <div class="small text-break px-2 mt-1"><?= htmlspecialchars($row['ppt']) ?></div>
@@ -424,7 +403,6 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
         (function() {
             const counter = <?= $counter ?>;
             
-            // Logic Peserta
             const searchInput = document.querySelector('.searchEdit' + counter);
             const checkboxes = document.querySelectorAll('.peserta-edit-checkbox' + counter);
             const hiddenInput = document.getElementById('inputEditHidden' + counter);
@@ -457,7 +435,6 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
             checkboxes.forEach(function(chk) { chk.addEventListener('change', updatePesertaValue); });
             updatePesertaValue();
 
-            // Logic Room Availability
             const bookedData = <?php echo json_encode($meetings_data, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>;
             const dateInput = document.getElementById('editTanggal' + counter);
             const timeInput = document.getElementById('editWaktu' + counter);
@@ -516,7 +493,6 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
                 document.getElementById('editModal<?= $row['id'] ?>').addEventListener('shown.bs.modal', updateRoomAvailability);
             }
 
-            // --- LOGIC PPT (FILE / URL) ---
             const fileInputPpt = document.getElementById('fileInputPpt' + counter);
             const urlInputPpt = document.getElementById('urlInputPpt' + counter);
             const useUrlPpt = document.getElementById('useUrlPpt' + counter);
@@ -525,25 +501,19 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
             const tabUrl = document.getElementById('url-tab-ppt' + counter);
 
             function updatePptPreview() {
-                // Reset preview box content
                 previewBoxPpt.innerHTML = ''; 
 
                 if (useUrlPpt.value === '1' && urlInputPpt.value.trim() !== '') {
-                    // Preview URL
                     const url = urlInputPpt.value.trim();
-                    // Cek apakah URL berakhiran gambar untuk preview visual
                     if (url.match(/\.(jpeg|jpg|gif|png)$/) != null) {
                          previewBoxPpt.innerHTML = `<img src="${url}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><div class="text-center" style="display:none"><i class="bi bi-link-45deg file-icon"></i><div class="small text-break px-2 mt-1">${url}</div></div>`;
                     } else {
                          previewBoxPpt.innerHTML = `<div class="text-center"><i class="bi bi-link-45deg file-icon"></i><div class="small text-break px-2 mt-1">${url}</div></div>`;
                     }
                 } else if (fileInputPpt.files && fileInputPpt.files[0]) {
-                    // Preview File
                     const fileName = fileInputPpt.files[0].name;
                     previewBoxPpt.innerHTML = `<div class="text-center"><i class="bi bi-file-earmark-arrow-up-fill file-icon"></i><div class="small text-break px-2 mt-1">${fileName}</div></div>`;
                 } else {
-                    // Default state (kita gunakan info PHP asli jika perlu, atau 'No file')
-                    // Tapi untuk edit dinamis, kita tampilkan placeholder jika kosong
                      previewBoxPpt.innerHTML = `<span class="text-muted small">Preview akan muncul di sini</span>`;
                 }
             }
@@ -567,7 +537,6 @@ while ($r = mysqli_fetch_assoc($q_rooms)) {
                 urlInputPpt.addEventListener('input', updatePptPreview);
             }
             
-            // Init preview saat modal dibuka untuk memastikan state sesuai
             document.getElementById('editModal<?= $row['id'] ?>').addEventListener('shown.bs.modal', function(){
                 updatePptPreview();
             });
