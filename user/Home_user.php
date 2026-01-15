@@ -146,13 +146,16 @@ main { transition:none; }
 <main class="container my-4 d-flex flex-column flex-grow-1">
 
 <form class="w-100 text-center mt-4 mb-5 d-flex justify-content-center" method="get" action="" style="position: relative;">
-    <div class="input-group w-50">
+    <div class="input-group w-50" style="position: relative;">
         <input type="text" name="query" class="form-control form-control-lg border border-2 border-dark-subtle" 
                placeholder="Cari nama, deskripsi, atau status..." 
                value="<?= htmlspecialchars($search) ?>" 
-               style="padding-right: 2rem;">
+               style="padding-right: 3rem;">
         <?php if ($search !== ''): ?>
-            <span onclick="window.location='Home_user.php'" class="position-absolute" style="right: calc(50% - 220px); top:50%; transform:translateY(-50%); cursor:pointer; font-weight:bold; font-size:1.25rem; color:#495057; user-select:none;" title="Hapus pencarian">&times;</span>
+            <span onclick="window.location='Home_user.php'" 
+                  class="position-absolute" 
+                  style="right: 98px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 1.5rem; color: #6c757d; z-index: 10; padding: 0 10px; user-select: none;" 
+                  title="Hapus pencarian">&times;</span>
         <?php endif; ?>
         <button type="submit" class="btn btn-primary btn-lg">Search</button>
     </div>
